@@ -6,13 +6,13 @@ namespace lib::units {
     struct Mole
     {
         using Dimension = Mole;
-        constexpr static std::string_view name() noexcept
+        constexpr static auto name() noexcept
         {
-            return "amount of substance";
+            return StaticString("amount of substance");
         }
-        constexpr static std::string_view symbol() noexcept
+        constexpr static auto symbol() noexcept
         {
-            return "mol";
+            return StaticString("mol");
         }
     };
     constexpr inline Unit<Mole> mole {};

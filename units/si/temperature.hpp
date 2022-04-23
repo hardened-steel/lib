@@ -6,13 +6,13 @@ namespace lib::units {
     struct Temperature
     {
         using Dimension = Temperature;
-        constexpr static std::string_view name() noexcept
+        constexpr static auto name() noexcept
         {
-            return "degree Kelvin";
+            return StaticString("degree Kelvin");
         }
-        constexpr static std::string_view symbol() noexcept
+        constexpr static auto symbol() noexcept
         {
-            return "K";
+            return StaticString("K");
         }
     };
     constexpr inline Unit<Temperature> kelvin {};

@@ -6,13 +6,13 @@ namespace lib::units {
     struct ECurrent
     {
         using Dimension = ECurrent;
-        constexpr static std::string_view name() noexcept
+        constexpr static auto name() noexcept
         {
-            return "electric current";
+            return StaticString("electric current");
         }
-        constexpr static std::string_view symbol() noexcept
+        constexpr static auto symbol() noexcept
         {
-            return "A";
+            return StaticString("A");
         }
     };
     constexpr inline Unit<ECurrent> ampere {};

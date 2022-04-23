@@ -6,13 +6,13 @@ namespace lib::units {
     struct LuminousIntensity
     {
         using Dimension = LuminousIntensity;
-        constexpr static std::string_view name() noexcept
+        constexpr static auto name() noexcept
         {
-            return "candela";
+            return StaticString("candela");
         }
-        constexpr static std::string_view symbol() noexcept
+        constexpr static auto symbol() noexcept
         {
-            return "cd";
+            return StaticString("cd");
         }
     };
     constexpr inline Unit<LuminousIntensity> candela {};

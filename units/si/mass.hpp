@@ -6,13 +6,13 @@ namespace lib::units {
     struct Mass
     {
         using Dimension = Mass;
-        constexpr static std::string_view name() noexcept
+        constexpr static auto name() noexcept
         {
-            return "mass";
+            return StaticString("mass");
         }
-        constexpr static std::string_view symbol() noexcept
+        constexpr static auto symbol() noexcept
         {
-            return "kg";
+            return StaticString("kg");
         }
     };
     constexpr inline Unit<Mass> kilogram {};

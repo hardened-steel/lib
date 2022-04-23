@@ -6,13 +6,13 @@ namespace lib::units {
     struct Length
     {
         using Dimension = Length;
-        constexpr static std::string_view name() noexcept
+        constexpr static auto name() noexcept
         {
-            return "length";
+            return StaticString("length");
         }
-        constexpr static std::string_view symbol() noexcept
+        constexpr static auto symbol() noexcept
         {
-            return "m";
+            return StaticString("m");
         }
     };
     constexpr inline Unit<Length> metre {};

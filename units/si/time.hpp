@@ -7,13 +7,13 @@ namespace lib {
         struct Time
         {
             using Dimension = Time;
-            constexpr static std::string_view name() noexcept
+            constexpr static auto name() noexcept
             {
-                return "seconds";
+                return StaticString("seconds");
             }
-            constexpr static std::string_view symbol() noexcept
+            constexpr static auto symbol() noexcept
             {
-                return "s";
+                return StaticString("s");
             }
         };
         using namespace std::chrono_literals;

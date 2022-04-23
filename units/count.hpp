@@ -7,13 +7,13 @@ namespace lib {
         struct Count
         {
             using Dimension = Multiplying<>;
-            constexpr static std::string_view name() noexcept
+            constexpr static auto name() noexcept
             {
-                return "counts";
+                return StaticString("counts");
             }
-            constexpr static std::string_view symbol() noexcept
+            constexpr static auto symbol() noexcept
             {
-                return "";
+                return StaticString("");
             }
         };
 
@@ -54,7 +54,7 @@ namespace lib {
     constexpr auto operator* (const Quantity<Unit, A, Ratio>& a, B b) noexcept
     {
         using Type = std::common_type_t<A, B>;
-        using CommonQuantity = Quantity<units::Count, Type, Ratio>;
+        using CommonQuantity = Quantity<units::Count, Type>;
         return a * CommonQuantity(b);
     }
 
@@ -62,7 +62,7 @@ namespace lib {
     constexpr auto operator* (A a, const Quantity<Unit, B, Ratio>& b) noexcept
     {
         using Type = std::common_type_t<A, B>;
-        using CommonQuantity = Quantity<units::Count, Type, Ratio>;
+        using CommonQuantity = Quantity<units::Count, Type>;
         return CommonQuantity(a) * b;
     }
 
@@ -70,7 +70,7 @@ namespace lib {
     constexpr auto operator/ (const Quantity<Unit, A, Ratio>& a, B b) noexcept
     {
         using Type = std::common_type_t<A, B>;
-        using CommonQuantity = Quantity<units::Count, Type, Ratio>;
+        using CommonQuantity = Quantity<units::Count, Type>;
         return a / CommonQuantity(b);
     }
 
@@ -78,7 +78,7 @@ namespace lib {
     constexpr auto operator/ (A a, const Quantity<Unit, B, Ratio>& b) noexcept
     {
         using Type = std::common_type_t<A, B>;
-        using CommonQuantity = Quantity<units::Count, Type, Ratio>;
+        using CommonQuantity = Quantity<units::Count, Type>;
         return CommonQuantity(a) / b;
     }
 }

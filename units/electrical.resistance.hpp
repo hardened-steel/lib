@@ -6,13 +6,13 @@ namespace lib::units {
     {
         //kg⋅m2⋅s−3⋅A−2
         using Dimension = Devide<Multiply<Mass, Length, Length>, Multiply<Time, Time, Time, ECurrent, ECurrent>>;
-        constexpr static std::string_view name() noexcept
+        constexpr static auto name() noexcept
         {
-            return "electrical resistance";
+            return StaticString("electrical resistance");
         }
-        constexpr static std::string_view symbol() noexcept
+        constexpr static auto symbol() noexcept
         {
-            return "ohm";
+            return StaticString("ohm");
         }
     };
 

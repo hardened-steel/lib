@@ -10,6 +10,8 @@ FetchContent_Declare(
 )
 FetchContent_MakeAvailable(googletest)
 
+set(CMAKE_CXX_STANDARD 17)
+
 set(SOURCES
     #units.cpp
 )

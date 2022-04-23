@@ -5,14 +5,14 @@ namespace lib::units {
     struct Voltage
     {
         //kg⋅m2⋅s−3⋅A−2
-        using Dimension = Devide<Multiply<Mass, Length, Length>, Multiply<Time, Time, Time, ECurrent>>;
-        constexpr static std::string_view name() noexcept
+        using Dimension = Devide<Multiply<Mass, Degree<Length, 2>>, Multiply<Degree<Time, 3>, ECurrent>>;
+        constexpr static auto name() noexcept
         {
-            return "voltage";
+            return StaticString("voltage");
         }
-        constexpr static std::string_view symbol() noexcept
+        constexpr static auto symbol() noexcept
         {
-            return "V";
+            return StaticString("V");
         }
     };
 
