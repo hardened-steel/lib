@@ -1,4 +1,4 @@
-#include "lib/static.string.hpp"
+#include <lib/static.string.hpp>
 #include <lib/units.hpp>
 #include <lib/units/electrical.resistance.hpp>
 #include <lib/units/voltage.hpp>
