@@ -22,7 +22,8 @@ namespace lib {
             }
             constexpr static auto symbol() noexcept
             {
-                return Unit::symbol() + ((StaticString("·") + Units::symbol()) + ...);
+                constexpr StaticString dot(".");
+                return Unit::symbol() + ((dot + Units::symbol()) + ...);
             }
         };
 
