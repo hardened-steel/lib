@@ -40,7 +40,7 @@ jobs:
     
     - name: Pack
       working-directory: ${{github.workspace}}/build
-      run: cpack -G TZ
+      run: cpack
 
     - uses: actions/upload-artifact@v3
       with:

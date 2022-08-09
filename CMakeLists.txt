@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.16)
-project(lib LANGUAGES CXX C)
+project(lib LANGUAGES CXX C VERSION 0.0.1)
 
 include(FetchContent)
 enable_testing()
@@ -18,6 +18,7 @@ set(SOURCES
 
 add_library(${PROJECT_NAME} INTERFACE)
 target_include_directories(${PROJECT_NAME} INTERFACE ${CMAKE_CURRENT_SOURCE_DIR}/../)
+install(TARGETS ${PROJECT_NAME})
 
 add_executable(${PROJECT_NAME}-test
     #test/test.cpp
@@ -34,3 +35,6 @@ set_target_properties(${PROJECT_NAME}-test
 )
 target_link_libraries(${PROJECT_NAME}-test PUBLIC ${PROJECT_NAME} gtest_main)
 add_test(NAME LibUnits COMMAND ${PROJECT_NAME}-test)
+install(TARGETS ${PROJECT_NAME}-test RUNTIME DESTINATION bin)
+
+include(CPack)
