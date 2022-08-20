@@ -1,0 +1,25 @@
+name: pull-request build and add comments
+
+on:
+  workflow_run:
+    workflows: ['CMake']
+    types:
+      - completed
+
+jobs:
+  check-build-log:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: Download a build artifacts
+        uses: actions/download-artifact@v3
+        with:
+          name: build-log
+
+      - name: Find errors
+        uses: actions/github-script@v6
+        with:
+          script: |
+            const script = require('./.github/scripts/find-errors.js')
+            await script({github, context, core})

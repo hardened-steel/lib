@@ -30,7 +30,13 @@ jobs:
 
     - name: Build
       # Build your program with the given configuration
-      run: cmake --build ${{github.workspace}}/build --config ${{matrix.BUILD_TYPE}}
+      run: cmake --build ${{github.workspace}}/build --config ${{matrix.BUILD_TYPE}} > build.${{matrix.os}}.${{matrix.BUILD_TYPE}}.log
+    
+    - name: Save build log
+      uses: actions/upload-artifact@v3
+      with:
+        name: build-log
+        path: build.${{matrix.os}}.${{matrix.BUILD_TYPE}}.log
 
     - name: Test
       working-directory: ${{github.workspace}}/build
