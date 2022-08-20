@@ -7,7 +7,8 @@
 
 int foo(){
 
-    for (;;) break;
+    for (;;) { break;
+}
 
 
     printf("Hello world!\n");
