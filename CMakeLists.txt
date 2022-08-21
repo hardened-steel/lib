@@ -21,7 +21,6 @@ target_include_directories(${PROJECT_NAME} INTERFACE ${CMAKE_CURRENT_SOURCE_DIR}
 install(TARGETS ${PROJECT_NAME})
 
 add_executable(${PROJECT_NAME}-test
-    #test/test.cpp
     test/units.cpp
 )
 set_target_properties(${PROJECT_NAME}-test
