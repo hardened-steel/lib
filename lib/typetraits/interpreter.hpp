@@ -1,5 +1,9 @@
 #pragma once
-#include "lib/typetraits/if.hpp"
+#include <array>
+#include <lib/typename.hpp>
+#include <lib/array.hpp>
+#include <lib/concept.hpp>
+#include <lib/typetraits/if.hpp>
 #include <lib/typetraits/set.hpp>
 #include <lib/typetraits/map.hpp>
 #include <type_traits>
@@ -13,6 +17,15 @@ namespace lib::typetraits {
     struct Value
     {
         constexpr static inline auto value = IValue;
+    };
+
+    template<auto Message>
+    struct Error;
+
+    template<std::size_t N, const std::array<char, N>* Message>
+    struct Error<Message>
+    {
+        constexpr static inline auto* message = Message->data(); 
     };
 
     namespace impl {
@@ -32,8 +45,12 @@ namespace lib::typetraits {
         template<class Variables, class Parent, class VarName, class Value>
         struct CreateVariableF<Context<Variables, Parent>, VarName, Value>
         {
-            static_assert(!exists<Variables, VarName>);
-            using Result = Context<Insert<Variables, Map<VarName, Value>>, Parent>;
+            constexpr static inline auto message = lib::concat("variable \'", lib::type_name_array<VarName>, "\' already exists in this scope\0");
+            using Result = If<
+                !exists<Variables, VarName>,
+                Context, List<Insert<Variables, Map<VarName, Value>>, Parent>,
+                Constant, List<Error<&message>>
+            >;
         };
 
         template<class Context, class VarName, class Value>
@@ -45,9 +62,13 @@ namespace lib::typetraits {
         template<class Variables, class VarName, class Value>
         struct WriteVariableF<Context<Variables, void>, VarName, Value>
         {
-            static_assert(exists<Variables, VarName>);
             using NewVariables = Insert<Variables, Map<VarName, Value>>;
-            using Result = Context<NewVariables, void>;
+            constexpr static inline auto message = lib::concat("write to undefined variable \'", lib::type_name_array<VarName>, "\'\0");
+            using Result = If<
+                exists<Variables, VarName>,
+                Context, List<Insert<Variables, Map<VarName, Value>>, void>,
+                Constant, List<Error<&message>>
+            >;
         };
 
         template<class Variables, class Parent, class VarName, class Value>
@@ -75,8 +96,12 @@ namespace lib::typetraits {
         template<class Variables, class VarName>
         struct ReadVariableF<Context<Variables, void>, VarName>
         {
-            static_assert(exists<Variables, VarName>);
-            using Result = Get<Variables, index<Variables, VarName>>;
+            constexpr static inline auto message = lib::concat("undefined variable \'", lib::type_name_array<VarName>, "\'\0");
+            using Result = If<
+                exists<Variables, VarName>,
+                Find, List<Variables, VarName>,
+                Constant, List<Error<&message>>
+            >;
         };
 
         template<class Variables, class Parent, class VarName>
@@ -111,6 +136,18 @@ namespace lib::typetraits {
         struct AddF<Value<Lhs>, Value<Rhs>>
         {
             using Result = Value<Lhs + Rhs>;
+        };
+
+        template<auto Lhs, class Rhs>
+        struct AddF<Error<Lhs>, Rhs>
+        {
+            using Result = Error<Lhs>;
+        };
+
+        template<class Lhs, auto Rhs>
+        struct AddF<Lhs, Error<Rhs>>
+        {
+            using Result = Error<Rhs>;
         };
     }
 
@@ -228,10 +265,52 @@ namespace lib::typetraits {
 
     namespace impl {
 
-        template<class Context, class Variable>
+        template<class Value, class Statement>
+        struct Action
+        {
+            using Result = Value;
+            static inline constexpr bool Break = true;
+        };
+
+        template<class Parent, class Body>
+        struct ActionScopeF
+        {
+            using Result = For<Body, Context<Map<>, Parent>, Action>;
+        };
+
+        template<class Parent, class Body>
+        using ActionScope = typename ActionScopeF<Parent, Body>::Result;
+
+        template<class Function, class Context>
+        struct CallF
+        {
+            using Body = typename Function::Body;
+            using Result = ActionScope<Context, Body>;
+        };
+
+        template<class Function, class Context = void>
+        using Call = typename CallF<Function, Context>::Result;
+
+        template<typename T>
+        struct IsFunctionF
+        {
+            template<typename U, class Body> struct SFINAE {};
+            template<typename U> static char Test(SFINAE<U, typename U::Body>*);
+            template<typename U> static int Test(...);
+            constexpr static inline bool Result = sizeof(Test<T>(nullptr)) == sizeof(char);
+        };
+
+        template<class T>
+        constexpr inline bool IsFunction = IsFunctionF<T>::Result;
+
+        template<class Context, class Name>
         struct CalcF
         {
-            using Result = ReadVariable<Context, Variable>;
+            using Result = If<
+                IsFunction<Name>,
+                Call, List<Name, Context>,
+                ReadVariable, List<Context, Name>
+            >;
         };
 
         template<class Context, class Expr>
@@ -273,8 +352,25 @@ namespace lib::typetraits {
             using Result = Value<value>;
         };
 
-        template<class Context, class Statement>
-        struct Action;
+        template<class Context, auto value>
+        struct CalcF<Context, Error<value>>
+        {
+            using Result = Error<value>;
+        };
+
+        template<class Context>
+        struct CheckContext
+        {
+            using Result = Context;
+            static inline constexpr bool Break = true;
+        };
+
+        template<class Variables, class Parent>
+        struct CheckContext<Context<Variables, Parent>>
+        {
+            using Result = Parent;
+            static inline constexpr bool Break = false;
+        };
 
         template<class Context, class Statement>
         using ActionResult = typename Action<Context, Statement>::Result;
@@ -301,32 +397,6 @@ namespace lib::typetraits {
             static inline constexpr bool Break = true;
         };
 
-        template<class Update>
-        struct ActionNext;
-
-        template<class Variables, class Parent>
-        struct ActionNext<Context<Variables, Parent>>
-        {
-            using Result = Parent;
-            static inline constexpr bool Break = false;
-        };
-
-        template<auto value>
-        struct ActionNext<Value<value>>
-        {
-            using Result = Value<value>;
-            static inline constexpr bool Break = true;
-        };
-
-        template<class Parent, class Body>
-        struct ActionScopeF
-        {
-            using Result = For<Body, Context<Map<>, Parent>, Action>;
-        };
-
-        template<class Parent, class Body>
-        using ActionScope = typename ActionScopeF<Parent, Body>::Result;
-
         template<class Context, class Condition, class ...Actions>
         struct Action<Context, lib::typetraits::If<Condition, Actions...>>
         {
@@ -336,7 +406,7 @@ namespace lib::typetraits {
                 ActionScope, List<Context, Scope<Actions...>>,
                 ActionScope, List<Context, Scope<>>
             >;
-            using Next = ActionNext<IfResult>;
+            using Next = CheckContext<IfResult>;
             using Result = typename Next::Result;
             static inline constexpr bool Break = Next::Break;
         };
@@ -350,7 +420,7 @@ namespace lib::typetraits {
                 ActionScope, List<Context, Scope<Actions...>>,
                 ActionScope, List<Context, Scope<>>
             >;
-            using Next = ActionNext<WhileResult>;
+            using Next = CheckContext<WhileResult>;
             static inline constexpr bool Break = Next::Break || !Value::value;
             using Result = If<
                 !Break,
@@ -358,20 +428,9 @@ namespace lib::typetraits {
                 Constant, List<typename Next::Result>
             >;
         };
-
-        template<template<class...> class Function, class ...Params>
-        struct CallF
-        {
-            using Body = typename Function<Params...>::Body;
-            // Create Context with params
-            using Result = ActionScope<void, Body>;
-        };
-
-        template<template<class...> class Function, class ...Params>
-        using Call = typename CallF<Function, Params...>::Result;
     }
 
-    template<template<class...> class Function, class ...Params>
-    using Call = impl::Call<Function, Params...>;
+    template<class Function>
+    using Call = impl::Call<Function, void>;
 
 }

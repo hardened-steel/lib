@@ -55,10 +55,10 @@ namespace lib {
         template<class T>
         constexpr inline auto type_name_array = get_type_name_array<T>();
 
-        template<std::size_t Value>
+        template<auto Value>
         struct ValueTag {};
 
-        template <std::size_t Value>
+        template <auto Value>
         constexpr auto get_value_string() noexcept
         {
             constexpr auto pretty = get_type_name<ValueTag<Value>>();
@@ -72,7 +72,7 @@ namespace lib {
             return pretty.substr(start, size);
         }
 
-        template <std::size_t Value>
+        template <auto Value>
         constexpr auto get_value_string_array() noexcept
         {
             constexpr auto pretty = get_value_string<Value>();
@@ -80,7 +80,7 @@ namespace lib {
             return create_array<size>(pretty);
         }
 
-        template <std::size_t Value>
+        template <auto Value>
         constexpr inline auto value_array = get_value_string_array<Value>();
     }
 
@@ -93,10 +93,10 @@ namespace lib {
         details::type_name::type_name_array<T>.size()
     };
 
-    template<std::size_t Value>
+    template<auto Value>
     constexpr inline auto tostring_array = details::type_name::value_array<Value>;
 
-    template<std::size_t Value>
+    template<auto Value>
     constexpr inline std::string_view tostring {
         details::type_name::value_array<Value>.data(),
         details::type_name::value_array<Value>.size()

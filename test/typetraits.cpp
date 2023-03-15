@@ -105,10 +105,41 @@ struct Factorial
     >;
 };
 
+struct ErrorFunction
+{
+    struct Variable;
+    using Body = Scope<
+        Write<Variable, Value<42>>,
+        Return<Variable>
+    >;
+};
+
+template<class A, class B>
+struct FooFunction
+{
+    using Body = Scope<
+        Return<Add<A, B>>
+    >;
+};
+
+template<class IValue>
+struct BarFunction
+{
+    struct Result;
+    using Body = Scope<
+        CreateVariable<Result, IValue>,
+        Return<Add<FooFunction<Result, Value<42>>, Value<0>>>
+    >;
+};
+
 TEST(typetraits, Interpreter)
 {
     using namespace lib::typetraits;
-    static_assert(Call<Factorial, Value<5>>::value == 120);
-    static_assert(Call<Factorial, Value<4>>::value == 24);
-    static_assert(Call<Factorial, Value<0>>::value == 1);
+    static_assert(Call<Factorial<Value<5>>>::value == 120);
+    static_assert(Call<Factorial<Value<4>>>::value == 24);
+    static_assert(Call<Factorial<Value<0>>>::value == 1);
+    EXPECT_STREQ(Call<ErrorFunction>::message, "write to undefined variable 'ErrorFunction::Variable'");
+    static_assert(Call<BarFunction<Value<10>>>::value == 52);
+    static_assert(impl::IsFunction<BarFunction<Value<10>>>);
 }
+
