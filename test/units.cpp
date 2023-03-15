@@ -1,3 +1,4 @@
+#include <iterator>
 #include <lib/static.string.hpp>
 #include <lib/units.hpp>
 #include <lib/units/electrical.resistance.hpp>

@@ -109,10 +109,11 @@ def BUILD_FIRST_SETS(grammar):
                     changed = True
     return first_sets
 
-def FIRST(sequence, grammar, first_sets):
+def FIRST(sequence, lookahead, grammar, first_sets):
+    epsilon = Terminal('ε')
     result = set()
     if not len(sequence):
-        result.add(Terminal('ε'))
+        result.add(lookahead)
         return result
 
     for symbol in sequence:
@@ -121,41 +122,45 @@ def FIRST(sequence, grammar, first_sets):
             return result
         stop = True
         for item in first_sets[symbol]:
-            result.add(item)
-            if item is Terminal('ε'):
+            if item is epsilon:
                 stop = False
+            else:
+                result.add(item)
         if stop:
+            if (len(result) > 1) and (epsilon in result):
+                result.remove(epsilon)
+            if (len(result) == 0):
+                result.add(epsilon)
             return result
 
-def CLOSURE(items, grammar, first_sets):
-    closure_items = set(items)
+def CLOSURE(closure_items, grammar, first_sets):
     changed = True
+    max_items = 0
     while changed:
         changed = False
-        for item in list(closure_items):
+        for item in closure_items:
             rule, dot_pos, lookahead = item
             sequence = rule.rhs
             if dot_pos < len(sequence) and isinstance(sequence[dot_pos], NonTerminal):
-                first = FIRST(sequence[dot_pos + 1:], grammar, first_sets)# | set(lookahead)
-                #first.add(lookahead)
+                first = FIRST(sequence[dot_pos + 1:], lookahead, grammar, first_sets)
                 for production in grammar.productions:
                     if production.lhs == sequence[dot_pos]:
-                        #new_item = Item(production, first, 0)
-                        if True:
-                            for terminal in first:
-                                new_item = Item(production, terminal, 0)
-                                if new_item not in closure_items:
-                                    closure_items.add(new_item)
-                                    changed = True
+                        for terminal in first:
+                            new_item = Item(production, terminal, 0)
+                            max_items += 1
+                            if new_item not in closure_items:
+                                closure_items.append(new_item)
+                                changed = True
+    print(f'max closure items: {max_items}')
     return closure_items
 
 def GOTO(items, symbol, grammar, first_sets):
-    goto_items = set()
+    goto_items = []
     for rule, dot_pos, lookahead in items:
         sequence = rule.rhs
         if dot_pos < len(sequence) and sequence[dot_pos] == symbol:
             new_item = Item(rule, lookahead, dot_pos + 1)
-            goto_items.add(new_item)
+            goto_items.append(new_item)
     return CLOSURE(goto_items, grammar, first_sets)
 
 def BUILD_AUTOMATION(grammar):
@@ -164,8 +169,7 @@ def BUILD_AUTOMATION(grammar):
         print("first table:")
         for rule, sequence in first_sets.items():
             print(f'\t{rule} => {sequence}')
-    start_item = Item(grammar.productions[0], Terminal("$"), 0)
-    states = [CLOSURE(set([start_item]), grammar, first_sets)]
+    states = [CLOSURE([Item(grammar.productions[0], Terminal("$"), 0)], grammar, first_sets)]
     goto_sets = defaultdict(set)
     transitions = []
     reduces = []
@@ -203,7 +207,7 @@ def BUILD_TABLE(grammar):
     if True:
         print("states:")
         for i, state in enumerate(states):
-            print(f'\tstate[{i}]: {state}')
+            print(f'\tstate[{i}, {len(state)}]: {state}')
 
         print("transitions:")
         for i, transition in enumerate(transitions):
@@ -211,10 +215,14 @@ def BUILD_TABLE(grammar):
 
         print("reduces:")
         for state, lookahead, rule in reduces:
-            print(f'\tstate is {state}, current symbol is \'{lookahead}\' => \"{rule}\"')
+            print(f'\tstate is {state}, current symbol is \'{lookahead}\' => \"{rule}\" [{grammar.productions.index(rule)}]')
 
     action_table = defaultdict(lambda: (Action.error, None, f'error'))
     goto_table = {}
+
+    for state, lookahead, rule in reduces:
+        key = (state, lookahead)
+        action_table[key] = (Action.reduce, rule, f'reduce-{grammar.productions.index(rule)}')
 
     for transition in transitions:
         begin, symbol, end = transition
@@ -222,11 +230,12 @@ def BUILD_TABLE(grammar):
             key = (begin, symbol)
             if key in action_table:
                 _, _, title = action_table[key]
-                raise Exception(f'(shift-{symbol}-{end})-({title}) conflict')
+                raise Exception(f'(shift-{end})-({title}) conflict')
             else:
-                action_table[key] = (Action.shift, end, f'shift-{symbol}-{end}')
+                action_table[key] = (Action.shift, end, f'shift-{end}')
         else:
             goto_table[(begin, symbol)] = (Action.goto, end, f'goto {end}')
+
     for i, state in enumerate(states):
         for item in state:
             rule, dot_pos, lookahead = item
@@ -236,22 +245,11 @@ def BUILD_TABLE(grammar):
                 if nonterminal == NonTerminal("S'") and rule == grammar.productions[0]:
                     key = (i, Terminal("$"))
                     if key in action_table:
-                        _, _, title = action_table[key]
-                        raise Exception(f'(accept)-({title}) conflict')
-                    else:
-                        action_table[key] = (Action.accept, None, f'accept')
-                elif True:
-                    for terminal in grammar.get_terminals():
-                        key = (i, terminal)
-                        if key in action_table:
-                            _, _, title = action_table[key]
-                            #raise Exception(f'(reduce-{terminal}-{rule})-({title}) conflict')
-                        else:
-                            action_table[key] = (Action.reduce, rule, f'reduce-{terminal}-{rule}')
+                        action, _, title = action_table[key]
+                        if not action is Action.reduce:
+                            raise Exception(f'(accept)-({title}) conflict')
+                    action_table[key] = (Action.accept, None, f'accept')
 
-
-    #for state, lookahead, rule in reduces:
-    #    action_table[(i, lookahead)] = (Action.reduce, rule, f'reduce-{lookahead}-{rule}')
     return action_table, goto_table
 
 def PARSE(grammar, sequence: list):
@@ -291,7 +289,7 @@ def PARSE(grammar, sequence: list):
                 stack.append(nonterminal)
                 stack.append(goto_table[(state, nonterminal)][1])
             if action is Action.accept:
-                return stack.pop()[1]
+                return stack.pop()
             if action is Action.error:
                 raise Exception("parse error")
 
@@ -302,13 +300,13 @@ class Grammar:
     def get_start_symbol(self):
         return self.productions[0].lhs
     
-    def get_NonTerminals(self):
-        NonTerminals = set()
+    def NonTerminals(self):
+        NonTerminals = []
         for production in self.productions:
-            NonTerminals.add(production.lhs)
+            NonTerminals.append(production.lhs)
         return NonTerminals
     
-    def get_terminals(self):
+    def Terminals(self):
         terminals = set()
         for production in self.productions:
             for symbol in production.rhs:
@@ -322,13 +320,13 @@ BA = Terminal("baa")
 
 # Определим продукции для грамматики
 productions_ = [
-    Production(NonTerminal("S'"), [SheepNoise, Terminal("$")]),
+    Production(NonTerminal("S'"), [SheepNoise]),
     Production(SheepNoise, [BA, SheepNoise]),
     Production(SheepNoise, [BA])
 ]
 
 productions = [
-    Production(NonTerminal("S'"), [NonTerminal("E"), Terminal("$")]),
+    Production(NonTerminal("S'"), [NonTerminal("E")]),
     Production(NonTerminal("E"), [NonTerminal("E"), Terminal("+"), NonTerminal("T")]),
     Production(NonTerminal("E"), [NonTerminal("T")]),
     Production(NonTerminal("T"), [NonTerminal("T"), Terminal("*"), NonTerminal("F")]),
@@ -338,7 +336,7 @@ productions = [
 ]
 
 productions2 = [
-    Production(NonTerminal("S'"), [NonTerminal("S"), Terminal("$")]),
+    Production(NonTerminal("S'"), [NonTerminal("S")]),
     Production(NonTerminal("S"), [NonTerminal("C"), NonTerminal("C")]),
     Production(NonTerminal("C"), [Terminal("c"), NonTerminal("C")]),
     Production(NonTerminal("C"), [Terminal("d")]),
@@ -347,8 +345,8 @@ productions2 = [
 # Создадим объект грамматики
 #sheep_grammar = Grammar(productions_)
 #sequence = [BA, BA, BA, Terminal("$")]
-#PARSE(Grammar(productions_), [BA, BA, BA, Terminal("$")])
+PARSE(Grammar(productions_), [BA, BA, BA, Terminal("$")])
 
-#PARSE(Grammar(productions), [Terminal("id"), Terminal("+"), Terminal("id"), Terminal("*"), Terminal("("), Terminal("id"), Terminal("+"), Terminal("id"), Terminal(")"), Terminal("$")])
-PARSE(Grammar(productions), [Terminal("id"), Terminal("*"), Terminal("id"), Terminal("+"), Terminal("id"), Terminal("$")])
-PARSE(Grammar(productions2), [Terminal("c"), Terminal("c"), Terminal("d"), Terminal("$")])
+PARSE(Grammar(productions), [Terminal("id"), Terminal("+"), Terminal("id"), Terminal("*"), Terminal("("), Terminal("id"), Terminal("+"), Terminal("id"), Terminal(")"), Terminal("$")])
+#PARSE(Grammar(productions), [Terminal("id"), Terminal("*"), Terminal("id"), Terminal("+"), Terminal("id"), Terminal("$")])
+PARSE(Grammar(productions2), [Terminal("c"), Terminal("d"), Terminal("d"), Terminal("$")])
