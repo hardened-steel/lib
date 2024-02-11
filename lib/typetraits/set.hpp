@@ -111,7 +111,7 @@ namespace lib::typetraits {
         template<class T>
         struct IndexF<Set<>, T>
         {
-            static inline constexpr std::size_t value = std::numeric_limits<std::size_t>::max();
+            static inline constexpr std::size_t value = 0;
         };
     }
 
