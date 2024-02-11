@@ -25,9 +25,9 @@ namespace lib {
     }
 
     template<class T, class Ratio>
-    class Quantity<units::Count, T, Ratio>: public QuantityBase<Unit<units::Count>, T, Ratio>
+    class Quantity<units::Count, T, Ratio>: public QuantityBase<lib::Unit<units::Count>, T, Ratio>
     {
-        using Base = QuantityBase<Unit<units::Count>, T, Ratio>;
+        using Base = QuantityBase<lib::Unit<units::Count>, T, Ratio>;
     public:
         using Base::Base;
         using Base::operator=;

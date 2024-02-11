@@ -25,11 +25,20 @@ namespace lib {
         #   error Unsupported compiler
         #endif
 
+        #if defined(__clang__) || defined(__GNUC__)
             const auto start = function.find(prefix) + prefix.size();
             const auto end = function.find(suffix);
             const auto size = end - start;
 
             return function.substr(start, size);
+        #else
+            const auto start = function.find(prefix) + prefix.size();
+            const auto end = function.find(suffix);
+            const auto size = end - start;
+
+            const auto type = function.substr(start, size);
+            return type.substr(type.find(' ') + 1);
+        #endif
         }
 
         template <std::size_t ...Is>
