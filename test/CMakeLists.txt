@@ -2,6 +2,7 @@ add_executable(${PROJECT_NAME}-test
     units.cpp
     #parser.cpp
     typetraits.cpp
+    interpreter.cpp
 )
 set_target_properties(${PROJECT_NAME}-test
     PROPERTIES

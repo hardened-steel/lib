@@ -1,6 +1,7 @@
 #pragma once
 #include <lib/units.hpp>
 #include <lib/literal.hpp>
+#include <lib/concept.hpp>
 
 namespace lib {
     namespace units {
@@ -25,9 +26,9 @@ namespace lib {
     }
 
     template<class T, class Ratio>
-    class Quantity<units::Count, T, Ratio>: public QuantityBase<lib::Unit<units::Count>, T, Ratio>
+    class Quantity<units::Count, T, Ratio>: public QuantityBase<units::Count, T, Ratio>
     {
-        using Base = QuantityBase<lib::Unit<units::Count>, T, Ratio>;
+        using Base = QuantityBase<units::Count, T, Ratio>;
     public:
         using Base::Base;
         using Base::operator=;
@@ -50,7 +51,12 @@ namespace lib {
     template<class T>
     Quantity(T value) -> Quantity<units::Count, T>;
 
-    template<class Unit, class A, class Ratio, class B>
+    template<
+        class Unit, class A, class Ratio, class B,
+        typename = lib::Require<
+            std::is_integral_v<B>
+        >
+    >
     constexpr auto operator* (const Quantity<Unit, A, Ratio>& a, B b) noexcept
     {
         using Type = std::common_type_t<A, B>;
@@ -58,7 +64,12 @@ namespace lib {
         return a * CommonQuantity(b);
     }
 
-    template<class Unit, class A, class Ratio, class B>
+    template<
+        class Unit, class A, class Ratio, class B,
+        typename = lib::Require<
+            std::is_integral_v<A>
+        >
+    >
     constexpr auto operator* (A a, const Quantity<Unit, B, Ratio>& b) noexcept
     {
         using Type = std::common_type_t<A, B>;
@@ -66,7 +77,12 @@ namespace lib {
         return CommonQuantity(a) * b;
     }
 
-    template<class Unit, class A, class Ratio, class B>
+    template<
+        class Unit, class A, class Ratio, class B,
+        typename = lib::Require<
+            std::is_integral_v<B>
+        >
+    >
     constexpr auto operator/ (const Quantity<Unit, A, Ratio>& a, B b) noexcept
     {
         using Type = std::common_type_t<A, B>;
@@ -74,7 +90,12 @@ namespace lib {
         return a / CommonQuantity(b);
     }
 
-    template<class Unit, class A, class Ratio, class B>
+    template<
+        class Unit, class A, class Ratio, class B,
+        typename = lib::Require<
+            std::is_integral_v<A>
+        >
+    >
     constexpr auto operator/ (A a, const Quantity<Unit, B, Ratio>& b) noexcept
     {
         using Type = std::common_type_t<A, B>;
