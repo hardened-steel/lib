@@ -25,7 +25,7 @@ namespace lib::typetraits {
     template<std::size_t N, const std::array<char, N>* Message>
     struct Error<Message>
     {
-        constexpr static inline auto* message = Message->data(); 
+        constexpr static inline const char* message = Message->data(); 
     };
 
     namespace impl {

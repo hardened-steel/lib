@@ -22,9 +22,7 @@ namespace lib {
 
         template<class T>
         constexpr inline bool has_toString = lib::detect<T, has_toString_t>;
-
     */
-
 }
 
 #define LIB_TYPE_HAS_MEMBER(Type, Member) lib::detect<Type, decltype(std::declval<Type>().Member)>
