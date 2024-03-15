@@ -42,6 +42,16 @@ namespace lib {
         {
             return std::string_view(string.data(), string.size());
         }
+
+        friend constexpr bool operator == (const StaticString& lhs, const StaticString& rhs) noexcept
+        {
+            for (std::size_t i = 0; i < N; ++i) {
+                if (lhs.string[i] != rhs.string[i]) {
+                    return false;
+                }
+            }
+            return true;
+        }
     };
 
     template<std::size_t N>

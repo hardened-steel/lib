@@ -17,7 +17,6 @@ namespace lib::typetraits {
     };
 
     namespace impl {
-
         template<class Set>
         struct ToListF;
 
@@ -80,6 +79,30 @@ namespace lib::typetraits {
     
     template<class Set, class T>
     using Insert = impl::Insert<Set, T>;
+
+    namespace impl {
+        template<class ...TList>
+        struct CreateSetF
+        {
+            using Result = typename CreateSetF<List<TList...>>::Result;
+        };
+
+        template<class T, class ...Ts>
+        struct CreateSetF<List<T, Ts...>>
+        {
+            using Set = typename CreateSetF<List<Ts...>>::Result;
+            using Result = Insert<Set, T>;
+        };
+
+        template<class T>
+        struct CreateSetF<List<T>>
+        {
+            using Result = Set<T>;
+        };
+    }
+
+    template<class ...TList>
+    using CreatetSet = typename impl::CreateSetF<TList...>::Result;
 
     namespace impl {
         template<class ...Ts, std::size_t Index>
@@ -182,4 +205,18 @@ namespace lib::typetraits {
 
     template<class Set, class T>
     using Erase = impl::Erase<Set, T>;
+
+    namespace impl {
+        template<class Set, template <typename> class F>
+        struct ApplyF;
+
+        template<template <typename> class F, class ...Ts>
+        struct ApplyF<Set<Ts...>, F>
+        {
+            using Result = Set<F<Ts>...>;
+        };
+    }
+
+    template<class Set, template <typename> class F>
+    using Apply = typename impl::ApplyF<Set, F>::Result;
 }
