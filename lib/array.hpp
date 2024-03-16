@@ -80,22 +80,70 @@ namespace lib {
     template<class T>
     class span
     {
-        T*          ptr;
-        std::size_t size;
+        T*          m_ptr  = nullptr;
+        std::size_t m_size = 0;
     public:
+        constexpr span() = default;
+
         template<std::size_t N>
         constexpr span(T(&array)[N]) noexcept
-        : ptr(array), size(N)
+        : m_ptr(array), m_size(N)
         {}
         
         template<std::size_t N>
         constexpr span(std::array<T, N>& array) noexcept
-        : ptr(array.data()), size(array.size())
+        : m_ptr(array.data()), m_size(array.size())
         {}
+
+        constexpr span(const span& other) = default;
+        constexpr span& operator=(const span& other) = default;
+
+        constexpr operator span<const T>() const noexcept
+        {
+            return span<const T>(m_ptr, m_size);
+        }
 
         constexpr const T& operator[](std::size_t index) const noexcept
         {
             return m_ptr[index];
+        }
+        constexpr T& operator[](std::size_t index) noexcept
+        {
+            return m_ptr[index];
+        }
+
+        constexpr auto data() noexcept
+        {
+            return m_ptr;
+        }
+        constexpr auto size() noexcept
+        {
+            return m_size;
+        }
+        constexpr auto begin() noexcept
+        {
+            return m_ptr;
+        }
+        constexpr auto end() noexcept
+        {
+            return m_ptr + m_size;
+        }
+
+        constexpr auto data() const noexcept
+        {
+            return m_ptr;
+        }
+        constexpr auto size() const noexcept
+        {
+            return m_size;
+        }
+        constexpr auto begin() const noexcept
+        {
+            return m_ptr;
+        }
+        constexpr auto end() const noexcept
+        {
+            return m_ptr + m_size;
         }
     };
 
@@ -118,6 +166,9 @@ namespace lib {
         constexpr span(std::initializer_list<T> list) noexcept
         : m_ptr(list.begin()), m_size(list.size())
         {}
+
+        constexpr span(const span& other) = default;
+        constexpr span& operator=(const span& other) = default;
 
         constexpr const T& operator[](std::size_t index) const noexcept
         {

@@ -3,11 +3,6 @@
 #include <lib/static.string.hpp>
 
 namespace lib::interpreter::const_expr {
-    template<std::size_t N>
-    struct TypeInfo
-    {
-        lib::StaticString<N> name;
-    };
 
     template<class T>
     struct TypeTrait;

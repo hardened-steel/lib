@@ -29,4 +29,10 @@ namespace lib::interpreter {
         using Parser = lib::literal::Parser<Chars...>;
         return ast::Literal<typename Parser::Type>(Parser::value);
     }
+
+    template<class T>
+    constexpr auto literal(const T& value) noexcept
+    {
+        return ast::Literal<T>(value);
+    }
 }

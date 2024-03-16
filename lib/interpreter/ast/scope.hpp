@@ -11,10 +11,10 @@ namespace lib::interpreter {
             using Result = void;
         };
 
-        template<std::size_t N, class InitExpression>
-        struct FilterVariableDeclarationF<VariableDeclaration<N, InitExpression>>
+        template<class InitExpression>
+        struct FilterVariableDeclarationF<VariableDeclaration<InitExpression>>
         {
-            using Result = VariableDeclaration<N, InitExpression>;
+            using Result = VariableDeclaration<InitExpression>;
         };
 
         template<class T>

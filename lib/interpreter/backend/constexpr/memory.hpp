@@ -3,11 +3,14 @@
 #include <lib/array.hpp>
 
 namespace lib::interpreter::const_expr {
-    template<std::size_t Size>
-    struct Memory
+
+    class Memory
     {
-        constexpr static inline std::uint32_t size = Size;
-        std::array<std::uint8_t, size> storage = {0};
+        lib::span<std::uint8_t> storage;
+    public:
+        constexpr Memory(lib::span<std::uint8_t> storage) noexcept
+        : storage(storage)
+        {}
 
         constexpr std::uint8_t load(std::uint32_t ptr, lib::tag_t<std::uint8_t>) const
         {

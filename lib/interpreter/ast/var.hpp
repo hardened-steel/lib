@@ -7,13 +7,13 @@
 
 namespace lib::interpreter {
     namespace ast {
-        template<std::size_t N, class InitExpression>
+        template<class InitExpression>
         struct VariableDeclaration: Statement
         {
-            lib::StaticString<N> name;
+            std::string_view name;
             InitExpression init;
 
-            constexpr explicit VariableDeclaration(lib::StaticString<N> name, const InitExpression& init) noexcept
+            constexpr explicit VariableDeclaration(std::string_view name, const InitExpression& init) noexcept
             : name(name), init(init)
             {}
             constexpr VariableDeclaration(const VariableDeclaration& other) = default;
@@ -26,12 +26,11 @@ namespace lib::interpreter {
             }
         };
 
-        template<std::size_t N>
         struct Variable: Expression
         {
-            lib::StaticString<N> name;
+            std::string_view name;
 
-            constexpr explicit Variable(lib::StaticString<N> name) noexcept
+            constexpr explicit Variable(std::string_view name) noexcept
             : name(name)
             {}
             constexpr Variable(const Variable& other) = default;
@@ -40,7 +39,7 @@ namespace lib::interpreter {
             template<class RValue, typename = lib::Require<std::is_base_of_v<Expression, RValue>>>
             constexpr auto operator=(const RValue& rhs) const noexcept
             {
-                return VariableDeclaration<N, RValue>(name, rhs);
+                return VariableDeclaration<RValue>(name, rhs);
             }
 
             template<class Context, class ...TArgs>
@@ -52,10 +51,9 @@ namespace lib::interpreter {
 
         struct Var
         {
-            template<std::size_t N>
-            constexpr auto operator()(const char (&name)[N]) const noexcept
+            constexpr auto operator()(std::string_view name) const noexcept
             {
-                return Variable<N - 1>(name);
+                return Variable(name);
             }
         };
     }

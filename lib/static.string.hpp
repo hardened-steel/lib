@@ -42,20 +42,20 @@ namespace lib {
         {
             return std::string_view(string.data(), string.size());
         }
-
-        friend constexpr bool operator == (const StaticString& lhs, const StaticString& rhs) noexcept
+        constexpr char operator[](std::size_t index) const noexcept
         {
-            for (std::size_t i = 0; i < N; ++i) {
-                if (lhs.string[i] != rhs.string[i]) {
-                    return false;
-                }
-            }
-            return true;
+            return string[index];
         }
     };
 
     template<std::size_t N>
     StaticString(const char (&string)[N]) -> StaticString<N - 1>;
+
+    template<std::size_t N>
+    constexpr auto string(const char (&str)[N]) noexcept
+    {
+        return StaticString<N - 1>(str);
+    }
 
     template<std::size_t A, std::size_t B>
     constexpr auto operator+ (const StaticString<A>& a, const StaticString<B>& b) noexcept
@@ -63,8 +63,25 @@ namespace lib {
         return StaticString<A + B>(lib::concat(a.string, b.string));
     }
 
-    namespace details {
+    template<
+        class Lhs, class Rhs,
+        typename = lib::Require<std::is_same_v<StaticString, Lhs> || std::is_same_v<StaticString, Rhs>>
+    >
+    constexpr auto operator == (const Lhs& lhs, const Rhs& rhs) noexcept
+    {
+        return static_cast<std::string_view>(lhs) == static_cast<std::string_view>(rhs);
+    }
 
+    template<
+        class Lhs, class Rhs,
+        typename = lib::Require<std::is_same_v<StaticString, Lhs> || std::is_same_v<StaticString, Rhs>>
+    >
+    constexpr auto operator != (const Lhs& lhs, const Rhs& rhs) noexcept
+    {
+        return static_cast<std::string_view>(lhs) != static_cast<std::string_view>(rhs);
+    }
+
+    namespace details {
         constexpr int numDigits(int x) noexcept
         {
             if(x < 0) {
@@ -77,7 +94,6 @@ namespace lib {
                 }
             }
         }
-
     }
 
     template<int Value>
