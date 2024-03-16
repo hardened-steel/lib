@@ -57,26 +57,20 @@ namespace lib {
         return StaticString<N - 1>(str);
     }
 
-    template<std::size_t A, std::size_t B>
-    constexpr auto operator+ (const StaticString<A>& a, const StaticString<B>& b) noexcept
+    template<std::size_t Lhs, std::size_t Rhs>
+    constexpr auto operator+ (const StaticString<Lhs>& lhs, const StaticString<Rhs>& rhs) noexcept
     {
-        return StaticString<A + B>(lib::concat(a.string, b.string));
+        return StaticString<Lhs + Rhs>(lib::concat(lhs.string, rhs.string));
     }
 
-    template<
-        class Lhs, class Rhs,
-        typename = lib::Require<std::is_same_v<StaticString, Lhs> || std::is_same_v<StaticString, Rhs>>
-    >
-    constexpr auto operator == (const Lhs& lhs, const Rhs& rhs) noexcept
+    template<std::size_t Lhs, std::size_t Rhs>
+    constexpr auto operator == (const StaticString<Lhs>& lhs, const StaticString<Rhs>& rhs) noexcept
     {
         return static_cast<std::string_view>(lhs) == static_cast<std::string_view>(rhs);
     }
 
-    template<
-        class Lhs, class Rhs,
-        typename = lib::Require<std::is_same_v<StaticString, Lhs> || std::is_same_v<StaticString, Rhs>>
-    >
-    constexpr auto operator != (const Lhs& lhs, const Rhs& rhs) noexcept
+    template<std::size_t Lhs, std::size_t Rhs>
+    constexpr auto operator != (const StaticString<Lhs>& lhs, const StaticString<Rhs>& rhs) noexcept
     {
         return static_cast<std::string_view>(lhs) != static_cast<std::string_view>(rhs);
     }

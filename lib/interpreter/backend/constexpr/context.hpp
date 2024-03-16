@@ -3,6 +3,7 @@
 #include <lib/interpreter/backend/constexpr/root.hpp>
 #include <lib/interpreter/backend/constexpr/typeinfo.hpp>
 #include <lib/interpreter/backend/constexpr/memory.hpp>
+#include <lib/lazy.string.hpp>
 
 namespace lib::interpreter::const_expr {
     struct VariableInfo
@@ -66,11 +67,10 @@ namespace lib::interpreter::const_expr {
     public:
         Memory& memory;
     private:
-        template<class Context>
-        constexpr static auto& get_variable(Context* ctx, std::string_view name)
+        template<class Context, class Name>
+        constexpr static auto& get_variable(Context* ctx, const Name& name)
         {
             if (ctx == nullptr) {
-                std::cout << "indentifier not found: " << name << std::endl;
                 throw std::out_of_range("indentifier not found");
             }
             for (auto& var: ctx->scope.variables) {
@@ -80,11 +80,10 @@ namespace lib::interpreter::const_expr {
             }
             return get_variable(ctx->get_parent(), name);
         }
-        template<class Context>
-        constexpr static auto& get_type(Context* ctx, std::string_view name)
+        template<class Context, class Name>
+        constexpr static auto& get_type(Context* ctx, const Name& name)
         {
             if (ctx == nullptr) {
-                std::cout << "type not found: " << name << std::endl;
                 throw std::out_of_range("type not found");
             }
             for (auto& type: ctx->scope.types) {
@@ -94,8 +93,8 @@ namespace lib::interpreter::const_expr {
             }
             return get_type(ctx->get_parent(), name);
         }
-        template<class Context>
-        constexpr static auto& get_function(Context* ctx, std::string_view name, lib::span<const std::string_view> ptypes)
+        template<class Context, class Name>
+        constexpr static auto& get_function(Context* ctx, const Name& name, lib::span<const std::string_view> ptypes)
         {
             if (ctx == nullptr) {
                 throw std::out_of_range("function not found");
