@@ -28,7 +28,7 @@ namespace lib {
             if (index < lhs.size()) {
                 return lhs[index];
             }
-            return rhs[index];
+            return rhs[index - lhs.size()];
         }
         constexpr char& operator[](std::size_t index) noexcept
         {
@@ -144,6 +144,11 @@ namespace lib {
         constexpr auto end() const noexcept
         {
             return ConstIterator(this, size());
+        }
+    public:
+        friend std::ostream& operator<<(std::ostream& stream, const LazyString& string)
+        {
+            return stream << string.lhs << string.rhs;
         }
     };
 

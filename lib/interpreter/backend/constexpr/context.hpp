@@ -141,65 +141,91 @@ namespace lib::interpreter::const_expr {
     public:
         // expressions
         template<class Lhs, class Rhs>
+        constexpr TypeInfo type(const ast::Sum<Lhs, Rhs>& sum)
+        {
+            return type(fn("operator: lhs + rhs")(sum.lhs, sum.rhs));
+        }
+        template<class Lhs, class Rhs>
         constexpr TypeInfo operator()(const ast::Sum<Lhs, Rhs>& sum, Pointer& sp)
         {
-            const TypeInfo ltype = sum.lhs(*this, sp);
-            const TypeInfo rtype = sum.rhs(*this, sp);
-            return ltype;
+            return fn("operator: lhs + rhs")(sum.lhs, sum.rhs)(*this, sp);
         }
 
+        constexpr TypeInfo type(const ast::Variable& var)
+        {
+            auto& var_info = get_variable(this, var.name);
+            return get_type(this, var_info.type);
+        }
         constexpr TypeInfo operator()(const ast::Variable& var, Pointer& sp)
         {
             auto& var_info = get_variable(this, var.name);
             auto& typeinfo = get_type(this, var_info.type);
             sp -= typeinfo.size;
-            fn(typeinfo.name + lib::string("::constructor"))(literal(var_info.ptr), literal(sp))(*this, sp);
+            const auto name = typeinfo.name + lib::string("::constructor");
+            auto ptr = sp;
+            fn(name)(literal(sp), literal(var_info.ptr))(*this, ptr);
             return typeinfo;
         }
 
         template<class T>
+        constexpr TypeInfo type(const ast::Literal<T>& literal)
+        {
+            using Type = TypeTrait<T>;
+            return get_type(this, Type::name);
+        }
+        template<class T>
         constexpr TypeInfo operator()(const ast::Literal<T>& literal, Pointer& sp)
         {
             using Type = TypeTrait<T>;
+            std::cout << "push[" << (sp - Type::size) << "]: " << literal.value << std::endl;
             Type::save(memory, sp -= Type::size, literal.value);
             return get_type(this, Type::name);
         }
 
         template<class Name, class Params, std::size_t ...I>
-        constexpr TypeInfo call(const ast::FunctionCall<Name, Params>& fcall, Pointer& sp, std::index_sequence<I...>)
+        constexpr TypeInfo type(const ast::FunctionCall<Name, Params>& fcall, std::index_sequence<I...>)
         {
-            auto ptr = sp;
-            struct Parameter
-            {
-                std::string_view type;
-                Pointer ptr;
-            };
-            const std::array params = {
-                [&] {
-                    auto type = std::get<I>(fcall.params)(*this, ptr);
-                    return Parameter {type.name, ptr};
-                }()
+            const std::array ptypes = {
+                type(std::get<I>(fcall.params)).name
                 ...
             };
+            const FunctionInfo& function = get_function(this, fcall.name, ptypes);
+            return get_type(this, function.rtype);
+        }
+        template<class Name, class Params, std::size_t ...I>
+        constexpr TypeInfo type(const ast::FunctionCall<Name, Params>& fcall)
+        {
+            return type(fcall, std::make_index_sequence<std::tuple_size_v<Params>>{});
+        }
+        template<class Name, class Params, std::size_t ...I>
+        constexpr TypeInfo call(const ast::FunctionCall<Name, Params>& fcall, Pointer& sp, std::index_sequence<I...>)
+        {
+            
             const std::array ptypes = {
-                params[I].type ...
+                type(std::get<I>(fcall.params)).name
+                ...
             };
             const FunctionInfo& function = get_function(this, fcall.name, ptypes);
+            sp -= get_type(this, function.rtype).size;
+            
+            auto ptr = sp;
             std::array args = {
                 VariableInfo {
-                    "__function_result__",
+                    "return::value",
                     function.rtype,
                     sp
                 },
                 VariableInfo {
                     function.params[I].name,
-                    params[I].type,
-                    params[I].ptr
+                    ptypes[I],
+                    (std::get<I>(fcall.params)(*this, ptr), ptr)
                 } ...
             };
 
             Context context(this, memory, ScopeInfo{{}, args, {}});
-            function.ptr(context, sp);
+            std::cout << "function call[" << sp << "]: " << fcall.name << std::endl;
+            function.ptr(context, ptr);
+
             return get_type(this, function.rtype);
         }
 
@@ -213,7 +239,10 @@ namespace lib::interpreter::const_expr {
         template<class RValue>
         constexpr bool operator()(const ast::Return<RValue>& ret, Pointer& sp)
         {
-            ret.expression(*this, sp);
+            auto typeinfo = ret.expression(*this, sp);
+            std::cout << "return: " << sp << std::endl;
+            const auto name = typeinfo.name + lib::string("::constructor");
+            fn(name)(literal((*this)["return::value"]), literal(sp))(*this, sp);
             return true;
         }
 
@@ -253,7 +282,7 @@ namespace lib::interpreter::const_expr {
     };
     
     template<class Name, class RType, class Parameters, class Body>
-    constexpr auto import_function(const ast::FunctionDefinition<Name, RType, Parameters, Body>& function)
+    constexpr auto import_function(const ast::Function<Name, RType, Parameters, Body>& function)
     {
         return FunctionInfo {
             function.name,
@@ -276,16 +305,31 @@ namespace lib::interpreter::const_expr {
         return import_functions(module, std::make_index_sequence<Module::fsize>{});
     }
 
+    template<class Module, std::size_t ...FI>
+    constexpr auto import_types(const Module& module, std::index_sequence<FI...>)
+    {
+        return std::array<FunctionInfo, sizeof...(FI)> {
+            import_type(std::get<FI>(module.functions)) ...
+        };
+    }
+    template<class Module>
+    constexpr auto import_types(const Module& module)
+    {
+        return import_types(module, std::make_index_sequence<Module::tsize>{});
+    }
+
     template<class Module, class ...TArgs>
     constexpr auto call(const Module& module, std::string_view function, const TArgs& ...args)
     {
         Pointer sp = 64;
         std::array<std::uint8_t, 256> storage = {0};
-        Memory memory = storage;
+        Memory memory(storage);
 
         auto functions = import_functions(module);
-
-        Context context(nullptr, memory, ScopeInfo{functions, {}, {}});
+        std::array types {
+            TypeInfo {"void", 0}, TypeInfo {"u32", 4}
+        };
+        Context context(nullptr, memory, ScopeInfo{functions, {}, types});
 
         const auto expression = fn(function)(literal(args) ...);
         expression(context, sp);

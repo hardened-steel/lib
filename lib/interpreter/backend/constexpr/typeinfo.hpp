@@ -16,7 +16,7 @@ namespace lib::interpreter::const_expr {
             memory.save(sp, value);
         };
         constexpr static inline auto load = [](auto& memory, Pointer sp) {
-            return memory.load(sp, value);
+            return memory.load(sp);
         };
     };
 }

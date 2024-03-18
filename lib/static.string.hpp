@@ -2,6 +2,7 @@
 #include <lib/array.hpp>
 #include <string_view>
 #include <utility>
+#include <ostream>
 
 namespace lib {
 
@@ -30,6 +31,15 @@ namespace lib {
         constexpr StaticString(const std::array<char, N>& string) noexcept
         : string(string)
         {}
+        constexpr StaticString(const StaticString& other) noexcept
+        : string(other.string)
+        {}
+        constexpr StaticString& operator=(const StaticString& other) = default;
+
+        constexpr auto data() noexcept
+        {
+            return string.data();
+        }
         constexpr auto data() const noexcept
         {
             return string.data();
@@ -42,9 +52,18 @@ namespace lib {
         {
             return std::string_view(string.data(), string.size());
         }
-        constexpr char operator[](std::size_t index) const noexcept
+        constexpr const char& operator[](std::size_t index) const noexcept
         {
             return string[index];
+        }
+        constexpr char& operator[](std::size_t index) noexcept
+        {
+            return string[index];
+        }
+    public:
+        friend std::ostream& operator<<(std::ostream& stream, const StaticString& string)
+        {
+            return stream << std::string_view(string);
         }
     };
 

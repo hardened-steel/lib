@@ -25,7 +25,7 @@ namespace lib::interpreter {
             }
         };
 
-        struct Param
+        struct ParameterCreator
         {
             constexpr auto operator()(std::string_view type, std::string_view name) const noexcept
             {
@@ -34,14 +34,14 @@ namespace lib::interpreter {
         };
 
         template<class Name, class RType, class Parameters, class Body>
-        struct FunctionDefinition
+        struct Function
         {
             RType      rtype;
             Name       name;
             Parameters params;
             Body       body;
 
-            constexpr explicit FunctionDefinition
+            constexpr explicit Function
             (
                 const RType& rtype, const Name& name,
                 const Parameters& params, const Body& body
@@ -49,8 +49,8 @@ namespace lib::interpreter {
             noexcept
             : rtype(rtype), name(name), params(params), body(body)
             {}
-            constexpr FunctionDefinition(const FunctionDefinition& other) = default;
-            constexpr FunctionDefinition& operator=(const FunctionDefinition& other) = default;
+            constexpr Function(const Function& other) = default;
+            constexpr Function& operator=(const Function& other) = default;
 
             template<class Context, class ...TArgs>
             constexpr auto operator()(Context& ctx, TArgs&& ...args) const
@@ -79,13 +79,13 @@ namespace lib::interpreter {
         };
 
         template<class Name, class RType, class Parameters>
-        struct FunctionDeclaration
+        struct FunctionPrototype
         {
-            Name       rtype;
-            RType      name;
+            RType      rtype;
+            Name       name;
             Parameters params;
 
-            constexpr explicit FunctionDeclaration
+            constexpr explicit FunctionPrototype
             (
                 const RType& rtype, const Name& name,
                 const Parameters& params
@@ -94,19 +94,19 @@ namespace lib::interpreter {
             : rtype(rtype), name(name), params(params)
             {}
 
-            constexpr FunctionDeclaration(const FunctionDeclaration& other) = default;
-            constexpr FunctionDeclaration& operator=(const FunctionDeclaration& other) = default;
+            constexpr FunctionPrototype(const FunctionPrototype& other) = default;
+            constexpr FunctionPrototype& operator=(const FunctionPrototype& other) = default;
 
             template<class ...Statements, typename = lib::Require<std::is_base_of_v<Statement, Statements>...>>
             constexpr auto operator()(const Statements& ...statements) const noexcept
             {
-                return FunctionDefinition(rtype, name, params, scope(statements...));
+                return Function(rtype, name, params, scope(statements...));
             }
 
-            template<class Function, typename = lib::Require<!std::is_base_of_v<Statement, Function>>>
-            constexpr auto operator()(const Function& function) const noexcept
+            template<class Functor, typename = lib::Require<!std::is_base_of_v<Statement, Functor>>>
+            constexpr auto operator()(const Functor& function) const noexcept
             {
-                return FunctionDefinition(rtype, name, params, FunctorBody<Function>(function));
+                return Function(rtype, name, params, FunctorBody<Functor>(function));
             }
 
             template<class Context, class ...TArgs>
@@ -131,9 +131,10 @@ namespace lib::interpreter {
             template<class ...Params, typename = lib::Require<std::is_same_v<Parameter, Params> ...>>
             constexpr auto operator()(const Params& ...params) const noexcept
             {
-                return FunctionDeclaration(
+                using Parameters = std::array<Parameter, sizeof...(Params)>;
+                return FunctionPrototype<Name, RType, Parameters>(
                     rtype, name,
-                    std::array<Parameter, sizeof...(Params)>{params...}
+                    Parameters{params...}
                 );
             }
 
@@ -182,14 +183,17 @@ namespace lib::interpreter {
                 return FunctionCall<Name, std::tuple<Params...>>(name, std::make_tuple(params...));
             }
 
-            template<class Context, class ...TArgs>
+            template<
+                class Context, class ...TArgs,
+                typename = lib::Require<!std::is_base_of_v<Expression, Context>, !std::is_base_of_v<Expression, TArgs>...>
+            >
             constexpr auto operator()(Context& ctx, TArgs&& ...args) const
             {
                 return ctx(*this, std::forward<TArgs>(args)...);
             }
         };
 
-        struct Function
+        struct FunctionCreator
         {
             template<class Name, class RType>
             constexpr auto operator()(const RType& rtype, const Name& name) const noexcept
@@ -208,6 +212,6 @@ namespace lib::interpreter {
         };
     }
 
-    constexpr inline ast::Param param;
-    constexpr inline ast::Function fn;
+    constexpr inline ast::ParameterCreator param;
+    constexpr inline ast::FunctionCreator  fn;
 }

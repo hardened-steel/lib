@@ -60,7 +60,7 @@ namespace lib::interpreter {
         return std::make_tuple(statemets...);
     }
 
-    struct FunctionDeclaration
+    struct FunctionPrototype
     {
         Name                  name;
         lib::span<const Var>  params;
@@ -68,20 +68,20 @@ namespace lib::interpreter {
     };
 
     template<class Body>
-    struct FunctionDefinition
+    struct Function
     {
-        FunctionDeclaration prototype;
+        FunctionPrototype prototype;
         Body body;
     };
 
     template<class Body>
     constexpr auto function(Name name, lib::span<const Var> params, lib::span<const Type> ret, Body body) noexcept
     {
-        return FunctionDefinition<Body>{FunctionDeclaration{name, params, ret}, body};
+        return Function<Body>{FunctionPrototype{name, params, ret}, body};
     }
 
     template<class Body>
-    constexpr auto compile(const FunctionDefinition<Body>& function)
+    constexpr auto compile(const Function<Body>& function)
     {
         return compile(function.body);
     }

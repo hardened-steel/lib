@@ -6,3 +6,4 @@
 #include <lib/interpreter/ast/return.hpp>
 #include <lib/interpreter/ast/function.hpp>
 #include <lib/interpreter/ast/module.hpp>
+#include <lib/interpreter/ast/type.hpp>

@@ -49,7 +49,15 @@ namespace lib::interpreter {
             }
         };
 
-        struct Var
+        struct VarCreator
+        {
+            constexpr auto operator()(std::string_view name) const noexcept
+            {
+                return Variable(name);
+            }
+        };
+
+        struct PtrCreator
         {
             constexpr auto operator()(std::string_view name) const noexcept
             {
@@ -58,5 +66,5 @@ namespace lib::interpreter {
         };
     }
 
-    constexpr inline ast::Var var;
+    constexpr inline ast::VarCreator var;
 }

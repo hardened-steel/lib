@@ -12,6 +12,8 @@ namespace lib::interpreter {
             std::tuple<Functions...> functions;
 
             constexpr static inline auto fsize = sizeof...(Functions);
+            constexpr static inline auto tsize = 0;
+            constexpr static inline auto vsize = 0;
 
             constexpr explicit Module(const Functions& ...functions) noexcept
             : functions(functions...)
