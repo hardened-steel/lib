@@ -3,7 +3,7 @@
 #include <lib/static.string.hpp>
 #include <lib/concept.hpp>
 
-namespace lib::interpreter {
+namespace lib::interpreter::ir {
     namespace ast {
         template<class ...Statements>
         struct Module
@@ -29,6 +29,6 @@ namespace lib::interpreter {
     template<class ...Statements>
     constexpr auto module(const Statements& ...statements) noexcept
     {
-        return ast::Module<Statements...>(statements...);
+        return ir::Module<Statements...>(statements...);
     }
 }

@@ -1,6 +1,6 @@
 #pragma once
 #include <tuple>
-#include <lib/interpreter/ast/statement.hpp>
+#include <lib/interpreter/ast/operator.hpp>
 #include <lib/typetraits/set.hpp>
 
 namespace lib::interpreter {
@@ -20,25 +20,27 @@ namespace lib::interpreter {
         template<class T>
         using FilterVariableDeclaration = typename FilterVariableDeclarationF<T>::Result;
 
-        template<class ...Statements>
+        template<class ...Operators>
         using GetVariables = lib::typetraits::Erase<
             lib::typetraits::Apply<
-                lib::typetraits::CreatetSet<Statements...>,
+                lib::typetraits::CreatetSet<Operators...>,
                 FilterVariableDeclaration
             >,
             void
         >;
 
-        template<class ...Statements>
-        struct Scope: Statement
+        template<class ...Operators>
+        struct Scope: Operator
         {
-            std::tuple<Statements...> statemets;
+            std::tuple<Operators...> operators;
 
-            constexpr explicit Scope(const Statements& ...statemets) noexcept
-            : statemets(statemets...)
+            constexpr static inline auto size = sizeof...(Operators);
+
+            constexpr explicit Scope(const Operators& ...operators) noexcept
+            : operators(operators...)
             {}
-            constexpr explicit Scope(const std::tuple<Statements...>& statemets) noexcept
-            : statemets(statemets)
+            constexpr explicit Scope(const std::tuple<Operators...>& operators) noexcept
+            : operators(operators)
             {}
             constexpr Scope(const Scope& other) = default;
             constexpr Scope& operator=(const Scope& other) = default;
@@ -51,9 +53,9 @@ namespace lib::interpreter {
         };
     }
 
-    template<class ...Statements>
-    constexpr auto scope(const Statements& ...statements) noexcept
+    template<class ...Operators>
+    constexpr auto scope(const Operators& ...operators) noexcept
     {
-        return ast::Scope<Statements...>(statements...);
+        return ast::Scope<Operators...>(operators...);
     }
 }

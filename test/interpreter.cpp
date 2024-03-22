@@ -1,5 +1,6 @@
 #include <gtest/gtest.h>
 #include <lib/interpreter/constexpr.hpp>
+#include <lib/interpreter/compiler.hpp>
 
 struct MyModule
 {
@@ -7,7 +8,7 @@ struct MyModule
     {
         using namespace lib::interpreter;
         return lib::interpreter::module(
-            fn("void", "u32::constructor")(param("u32", "this"), param("u32", "other"))(
+            /*fn("void", "u32::constructor")(param("u32", "this"), param("u32", "other"))(
                 [](auto& context, const_expr::Pointer sp) noexcept {
                     auto& memory = context.memory;
                     const auto ptr = memory.load(context["this"], lib::tag<const_expr::Pointer>);
@@ -31,7 +32,7 @@ struct MyModule
                     const auto rhs = memory.load(context["rhs"], lib::tag<std::uint32_t>);
                     memory.save(context["return::value"], lhs + rhs);
                 }
-            ),
+            ),*/
             fn("u32", "bar")(param("u32", "lhs"), param("u32", "rhs"))(
                 //var("a") = fn("foo")(var("lhs"), 5_l),
                 //var("b") = fn("foo")(var("lhs"), 5_l),
@@ -67,6 +68,13 @@ struct Type2
 {
     constexpr static inline std::array type {
         StructBegin, U8, Ptr, U8, Ptr, StructBegin, U8, U8, StructEnd, U8, StructEnd
+    };
+};
+
+struct Type3
+{
+    constexpr static inline std::array type {
+        StructBegin, U8, Ptr, U8, Ptr, U8, StructEnd, StructBegin, U8, U8, StructEnd
     };
 };
 
@@ -171,13 +179,19 @@ using GetType = ConvertListToTuple<typename GetTypeF<T>::Type>;
 
 TEST(grammar, test)
 {
-    using T0 = GetType<Type0>;
-    using T1 = GetType<Type1>;
-    using T2 = GetType<Type2>;
-    std::cout << lib::type_name<T2> << std::endl;
-    //constexpr auto module = Compiler<MyModule>::compile();
     using namespace lib::interpreter;
-    //const auto storage = const_expr::call(MyModule::import(), "bar", std::uint32_t(10), std::uint32_t(2));
-    //const_expr::Memory memory(storage);
-    //std::cout << memory.load(60, lib::tag<std::uint32_t>) << std::endl;
+    const std::array functions = {
+        FunctionInfo{"operator: lhs + rhs", "u32", {param("u32", "lhs"), param("u32", "rhs")}},
+        FunctionInfo{"u32::constructor", "void", {param("u32", "this"), param("u32", "value")}}
+    };
+    auto context = make_context(init_types, null_variables, functions, null_text);
+    compile_function(
+        context,
+        fn("u32", "bar")(param("u32", "lhs"), param("u32", "rhs"))(
+            //var("a") = fn("foo")(var("lhs"), 5_l),
+            //var("b") = fn("foo")(var("lhs"), 5_l),
+            //ret(var("a") + var("b") + 10_l)
+            ret(var("lhs") + var("rhs"))
+        )
+    );
 }

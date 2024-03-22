@@ -1,5 +1,5 @@
 #pragma once
-#include <lib/interpreter/ast/statement.hpp>
+#include <lib/interpreter/ast/operator.hpp>
 #include <lib/interpreter/ast/expression.hpp>
 #include <lib/typetraits/set.hpp>
 #include <lib/static.string.hpp>
@@ -8,7 +8,7 @@
 namespace lib::interpreter {
     namespace ast {
         template<class InitExpression>
-        struct VariableDeclaration: Statement
+        struct VariableDeclaration: Operator
         {
             std::string_view name;
             InitExpression init;

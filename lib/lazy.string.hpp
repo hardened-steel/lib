@@ -21,18 +21,18 @@ namespace lib {
 
         constexpr auto size() const noexcept
         {
-            return lhs.size() + rhs.size();
+            return std::size(lhs) + std::size(rhs);
         }
         constexpr const char& operator[](std::size_t index) const noexcept
         {
-            if (index < lhs.size()) {
+            if (index < std::size(lhs)) {
                 return lhs[index];
             }
-            return rhs[index - lhs.size()];
+            return rhs[index - std::size(lhs)];
         }
         constexpr char& operator[](std::size_t index) noexcept
         {
-            if (index < lhs.size()) {
+            if (index < std::size(lhs)) {
                 return lhs[index];
             }
             return rhs[index];
@@ -136,6 +136,10 @@ namespace lib {
             {
                 return !(lhs == rhs);
             }
+            friend constexpr difference_type operator-(const ConstIterator& lhs, const ConstIterator& rhs) noexcept
+            {
+                return lhs.index - rhs.index;
+            }
         };
         constexpr auto begin() const noexcept
         {
@@ -151,6 +155,9 @@ namespace lib {
             return stream << string.lhs << string.rhs;
         }
     };
+
+    template<class Lhs, class Rhs>
+    LazyString(Lhs&& lhs, Rhs&& rhs) -> LazyString<std::remove_cv_t<std::remove_reference_t<Lhs>>, std::remove_cv_t<std::remove_reference_t<Rhs>>>;
 
     template<class T>
     struct IsStringF
@@ -174,14 +181,51 @@ namespace lib {
     };
 
     template<
+        class String,
+        typename = lib::Require<
+            is_string<
+                std::remove_cv_t<std::remove_reference_t<String>>
+            >
+        >
+    >
+    constexpr auto&& convert_string(String&& string) noexcept
+    {
+        return std::forward<String>(string);
+    }
+
+    template<std::size_t N>
+    constexpr auto convert_string(const char (&string)[N]) noexcept
+    {
+        return std::string_view(string);
+    }
+
+    template<
         class Lhs, class Rhs,
-        typename = lib::Require<is_string<Lhs>, is_string<Rhs>>
+        typename = lib::Require<
+            is_string<std::remove_cv_t<std::remove_reference_t<Lhs>>>,
+            is_string<std::remove_cv_t<std::remove_reference_t<Rhs>>>
+        >
     >
     constexpr auto operator + (Lhs&& lhs, Rhs&& rhs) noexcept
     {
-        using TL = std::remove_cv_t<std::remove_reference_t<Lhs>>;
-        using TR = std::remove_cv_t<std::remove_reference_t<Rhs>>;
-        return LazyString<TL, TR>(std::forward<Lhs>(lhs), std::forward<Rhs>(rhs));
+        return LazyString(convert_string(std::forward<Lhs>(lhs)), convert_string(std::forward<Rhs>(rhs)));
+    }
+
+    template<
+        class Lhs, class Rhs,
+        typename = lib::Require<is_string<Lhs>, is_string<Rhs>>
+    >
+    constexpr auto compare_strings(const Lhs& lhs, const Rhs& rhs) noexcept
+    {
+        if (std::size(lhs) == std::size(rhs)) {
+            for (std::size_t i = 0; i < std::size(lhs); ++i) {
+                if (lhs[i] != rhs[i]) {
+                    return false;
+                }
+            }
+            return true;
+        }
+        return false;
     }
 
     template<
@@ -190,14 +234,6 @@ namespace lib {
     >
     constexpr auto operator == (const Lhs& lhs, const Rhs& rhs) noexcept
     {
-        if (lhs.size() == rhs.size()) {
-            for (std::size_t i = 0; i < lhs.size(); ++i) {
-                if (lhs[i] != rhs[i]) {
-                    return false;
-                }
-            }
-            return true;
-        }
-        return false;
+        return compare_strings(convert_string(lhs), convert_string(rhs));
     }
 }

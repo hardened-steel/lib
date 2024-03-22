@@ -34,12 +34,14 @@ namespace lib::interpreter {
         };
 
         template<class Name, class RType, class Parameters, class Body>
-        struct Function
+        struct Function: Statement
         {
             RType      rtype;
             Name       name;
             Parameters params;
             Body       body;
+
+            constexpr static inline auto psize = std::tuple_size_v<Parameters>;
 
             constexpr explicit Function
             (
@@ -60,7 +62,7 @@ namespace lib::interpreter {
         };
 
         template<class Fn>
-        struct FunctorBody: Statement
+        struct FunctorBody: Operator
         {
             Fn functor;
 
@@ -97,13 +99,13 @@ namespace lib::interpreter {
             constexpr FunctionPrototype(const FunctionPrototype& other) = default;
             constexpr FunctionPrototype& operator=(const FunctionPrototype& other) = default;
 
-            template<class ...Statements, typename = lib::Require<std::is_base_of_v<Statement, Statements>...>>
-            constexpr auto operator()(const Statements& ...statements) const noexcept
+            template<class ...Operators, typename = lib::Require<std::is_base_of_v<Operator, Operators>...>>
+            constexpr auto operator()(const Operators& ...operators) const noexcept
             {
-                return Function(rtype, name, params, scope(statements...));
+                return Function(rtype, name, params, scope(operators...));
             }
 
-            template<class Functor, typename = lib::Require<!std::is_base_of_v<Statement, Functor>>>
+            template<class Functor, typename = lib::Require<!std::is_base_of_v<Operator, Functor>>>
             constexpr auto operator()(const Functor& function) const noexcept
             {
                 return Function(rtype, name, params, FunctorBody<Functor>(function));

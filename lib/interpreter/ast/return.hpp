@@ -6,7 +6,7 @@
 namespace lib::interpreter {
     namespace ast {
         template<class RValue>
-        struct Return: Statement
+        struct Return: Operator
         {
             RValue expression;
 
