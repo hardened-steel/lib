@@ -1,153 +1,197 @@
 #include <gtest/gtest.h>
-#include <lib/typename.hpp>
-#include <lib/literal.hpp>
-#include <lib/concept.hpp>
-#include <lib/static.string.hpp>
-#include <lib/interpreter/core.hpp>
-#include <iostream>
+#include <lib/interpreter/constexpr.hpp>
+#include <lib/interpreter/compiler.hpp>
 
-namespace lib::interpreter {
-
-    template<class Constructors, class Destructor, class Functions>
-    struct TypeInfo
+struct MyModule
+{
+    constexpr static auto import() noexcept
     {
-        std::uint32_t    size;
-        //std::string_view name;
-
-        Constructors constructors;
-        Destructor   destructor;
-        Functions    functions;
-    };
-
-    struct Expression {};
-
-    template<class T>
-    struct Literal: Expression
-    {
-        T value;
-
-        template<class Context>
-        constexpr void calc(Context& ctx) const noexcept
-        {
-            ctx.push(value);
-        }
-
-        friend constexpr static bool operator==(const Literal& lhs, const Literal& rhs) noexcept
-        {
-            return lhs.value == rhs.value;
-        }
-
-        constexpr explicit Literal(T value) noexcept
-        : value(value)
-        {}
-        constexpr Literal(const Literal& other) = default;
-        constexpr Literal& operator=(const Literal& other) = default;
-    };
-
-    template<char ...Chars>
-    constexpr auto operator ""_l() noexcept
-    {
-        using Parser = lib::literal::Parser<Chars...>;
-        return Literal<typename Parser::Type>(Parser::value);
+        using namespace lib::interpreter;
+        return lib::interpreter::module(
+            /*fn("void", "u32::constructor")(param("u32", "this"), param("u32", "other"))(
+                [](auto& context, const_expr::Pointer sp) noexcept {
+                    auto& memory = context.memory;
+                    const auto ptr = memory.load(context["this"], lib::tag<const_expr::Pointer>);
+                    const auto other = memory.load(context["other"], lib::tag<std::uint32_t>);
+                    const auto val = memory.load(other, lib::tag<std::uint32_t>);
+                    memory.save(ptr, val);
+                }
+            ),
+            fn("u32", "operator: lhs + rhs")(param("u32", "lhs"), param("u32", "rhs"))(
+                [](auto& context, const_expr::Pointer sp) noexcept {
+                    auto& memory = context.memory;
+                    const auto lhs = memory.load(context["lhs"], lib::tag<std::uint32_t>);
+                    const auto rhs = memory.load(context["rhs"], lib::tag<std::uint32_t>);
+                    memory.save(context["return::value"], lhs + rhs);
+                }
+            ),
+            fn("u32", "foo")(param("u32", "lhs"), param("u32", "rhs"))(
+                [](auto& context, const_expr::Pointer sp) noexcept {
+                    auto& memory = context.memory;
+                    const auto lhs = memory.load(context["lhs"], lib::tag<std::uint32_t>);
+                    const auto rhs = memory.load(context["rhs"], lib::tag<std::uint32_t>);
+                    memory.save(context["return::value"], lhs + rhs);
+                }
+            ),*/
+            fn("u32", "bar")(param("u32", "lhs"), param("u32", "rhs"))(
+                //var("a") = fn("foo")(var("lhs"), 5_l),
+                //var("b") = fn("foo")(var("lhs"), 5_l),
+                //ret(var("a") + var("b") + 10_l)
+                ret(var("lhs") + var("rhs"))
+            )
+        );
     }
+};
 
-    template<class Lhs, class Rhs>
-    struct Sum: Expression
-    {
-        Lhs lhs;
-        Rhs rhs;
+enum Types: std::uint32_t
+{
+    U8,
+    Ptr,
+    StructBegin, StructEnd
+};
 
-        template<class Context>
-        constexpr void calc(Context& ctx) const
-        {
-            lhs.calc(ctx);
-            rhs.calc(ctx);
-            ctx.add();
-        }
-
-        constexpr explicit Sum(const Lhs& lhs, const Rhs& rhs) noexcept
-        : lhs(lhs), rhs(rhs)
-        {}
-        constexpr Sum(const Sum& other) = default;
-        constexpr Sum& operator=(const Sum& other) = default;
+struct Type0
+{
+    constexpr static inline std::array type {
+        U8
     };
+};
 
-    template<class Lhs, class Rhs, typename = lib::Require<std::is_base_of_v<Expression, Lhs>, std::is_base_of_v<Expression, Rhs>>>
-    constexpr auto operator+(const Lhs& lhs, const Rhs& rhs) noexcept
-    {
-        return Sum<Lhs, Rhs>(lhs, rhs);
-    }
-
-    template<std::size_t N>
-    struct Variable: Expression
-    {
-        lib::StaticString<N> name;
-
-        template<class Context>
-        constexpr void calc(Context& ctx) const noexcept
-        {
-            ctx.get(name);
-        }
-
-        constexpr explicit Variable(lib::StaticString<N> name) noexcept
-        : name(name)
-        {}
-        constexpr Variable(const Variable& other) = default;
-        constexpr Variable& operator=(const Variable& other) = default;
+struct Type1
+{
+    constexpr static inline std::array type {
+        Ptr, U8
     };
+};
 
-    struct Var
-    {
-        template<std::size_t N>
-        constexpr auto operator()(const char (&string)[N]) const noexcept
-        {
-            return Variable(lib::StaticString(string));
-        }
+struct Type2
+{
+    constexpr static inline std::array type {
+        StructBegin, U8, Ptr, U8, Ptr, StructBegin, U8, U8, StructEnd, U8, StructEnd
     };
-    constexpr inline Var var;
+};
 
-    struct Statement {};
-
-    template<class ...Statements>
-    struct Scope: Statement
-    {
-        std::tuple<Statements...> statemets;
-
-        constexpr explicit Scope(const Statements& ...statemets) noexcept
-        : statemets(statemets...)
-        {}
-        constexpr explicit Scope(const std::tuple<Statements...>& statemets) noexcept
-        : statemets(statemets)
-        {}
-        constexpr Scope(const Scope& other) = default;
-        constexpr Scope& operator=(const Scope& other) = default;
+struct Type3
+{
+    constexpr static inline std::array type {
+        StructBegin, U8, Ptr, U8, Ptr, U8, StructEnd, StructBegin, U8, U8, StructEnd
     };
+};
 
-    class CalcContext: Context<256, 128>
+template<class T>
+struct MakeStruct
+{
+    constexpr static inline auto type = lib::concat(std::array{StructBegin}, T::type);
+};
+
+template<Types ...types>
+struct DecodeTypeF;
+
+template<class T, class Indexes = void>
+struct GetTypeF;
+
+template<Types ...types>
+using DecodeType = typename DecodeTypeF<types...>::Type;
+
+template<Types ...types>
+struct DecodeTypeF<U8, types...>
+{
+    using Type = std::uint8_t;
+    struct Tail
     {
-        using Base = Context<256, 128>;
-        std::uint32_t sp = 128;
-    public:
-        template<class T>
-        constexpr auto push(T value) noexcept
-        {
-            Base::push(sp, value);
-            return sp &= 0xFFFFFFC;
-        }
-
-        constexpr auto add(std::uint32_t lhs, std::uint32_t rhs) noexcept
-        {
-
-        }
+        constexpr static inline std::array<Types, sizeof...(types)> type {
+            types...
+        };
     };
-}
+};
+
+template<Types ...types>
+struct DecodeTypeF<Ptr, types...>
+{
+    using Decode = DecodeTypeF<types...>;
+    using Type = typename Decode::Type*;
+    using Tail = typename Decode::Tail;
+};
+
+template<Types ...types>
+struct DecodeTypeF<StructBegin, types...>
+{
+    using DecodeHead = DecodeTypeF<types...>;
+    using DecodeTail = GetTypeF<MakeStruct<typename DecodeHead::Tail>>;
+    using Type = lib::typetraits::Concat<
+        lib::typetraits::List<typename DecodeHead::Type>,
+        typename DecodeTail::Type
+    >;
+    using Tail = typename DecodeTail::Tail;
+};
+
+template<Types ...types>
+struct DecodeTypeF<StructBegin, StructEnd, types...>
+{
+    using Type = lib::typetraits::List<>;
+    struct Tail
+    {
+        constexpr static inline std::array<Types, sizeof...(types)> type {
+            types...
+        };
+    };
+};
+
+template<class T, class Indexes>
+struct GetTypeF
+{
+    using Decode = GetTypeF<T, std::make_index_sequence<T::type.size()>>;
+    using Type = typename Decode::Type;
+    using Tail = typename Decode::Tail;
+};
+
+template<class T, std::size_t ...I>
+struct GetTypeF<T, std::index_sequence<I...>>
+{
+    using Decode = DecodeTypeF<T::type[I]...>;
+    using Type = typename Decode::Type;
+    using Tail = typename Decode::Tail;
+};
+
+template<class T>
+struct ConvertListToTupleF
+{
+    using Type = T;
+};
+
+template<class T>
+using ConvertListToTuple = typename ConvertListToTupleF<T>::Type;
+
+template<class ...Ts>
+struct ConvertListToTupleF<lib::typetraits::List<Ts...>>
+{
+    using Type = std::tuple<ConvertListToTuple<Ts>...>;
+};
+
+template<class ...Ts>
+struct ConvertListToTupleF<lib::typetraits::List<Ts...>*>
+{
+    using Type = std::tuple<ConvertListToTuple<Ts>...>*;
+};
+
+template<class T>
+using GetType = ConvertListToTuple<typename GetTypeF<T>::Type>;
 
 TEST(grammar, test)
 {
     using namespace lib::interpreter;
-    lib::interpreter::CalcContext context;
-    EXPECT_EQ(10_l, Literal<std::uint8_t>{10});
-    constexpr auto expr = 10_l + 10_l;
-    expr.calc(context);
-    constexpr auto a = var("a");
+    const std::array functions = {
+        FunctionInfo{"operator: lhs + rhs", "u32", {param("u32", "lhs"), param("u32", "rhs")}},
+        FunctionInfo{"u32::constructor", "void", {param("u32", "this"), param("u32", "value")}}
+    };
+    auto context = make_context(init_types, null_variables, functions, null_text);
+    compile_function(
+        context,
+        fn("u32", "bar")(param("u32", "lhs"), param("u32", "rhs"))(
+            //var("a") = fn("foo")(var("lhs"), 5_l),
+            //var("b") = fn("foo")(var("lhs"), 5_l),
+            //ret(var("a") + var("b") + 10_l)
+            ret(var("lhs") + var("rhs"))
+        )
+    );
 }
