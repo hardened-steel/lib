@@ -88,8 +88,8 @@ namespace lib::typetraits {
         template<class ...Lists>
         struct ConcatF;
 
-        template<class ...Lists>
-        using Concat = typename ConcatF<Lists...>::Result;
+        //template<class ...Lists>
+        //using Concat = typename ConcatF<Lists...>::Result;
 
         template<class ...LhsTs, class ...RhsTs>
         struct ConcatF<List<LhsTs...>, List<RhsTs...>>
@@ -97,21 +97,27 @@ namespace lib::typetraits {
             using Result = List<LhsTs..., RhsTs...>;
         };
 
-        template<class List>
-        struct ConcatF<List>
+        template<class ...Ts>
+        struct ConcatF<List<Ts...>>
         {
-            using Result = List;
+            using Result = List<Ts...>;
         };
 
-        template<class Head, class ...Tail>
-        struct ConcatF<Head, Tail...>
+        template<>
+        struct ConcatF<>
         {
-            using Result = Concat<Head, Concat<Tail...>>;
+            using Result = List<>;
+        };
+
+        template<class ...HeadTs, class ...Tail>
+        struct ConcatF<List<HeadTs...>, Tail...>
+        {
+            using Result = typename ConcatF<List<HeadTs...>, typename ConcatF<Tail...>::Result>::Result;
         };
     }
 
     template<class ...Lists>
-    using Concat = impl::Concat<Lists...>;
+    using Concat = typename impl::ConcatF<Lists...>::Result;
 
     namespace impl {
         template<class List, std::size_t Index>

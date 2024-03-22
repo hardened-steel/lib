@@ -2,6 +2,7 @@
 #include <lib/array.hpp>
 #include <string_view>
 #include <utility>
+#include <ostream>
 
 namespace lib {
 
@@ -30,6 +31,15 @@ namespace lib {
         constexpr StaticString(const std::array<char, N>& string) noexcept
         : string(string)
         {}
+        constexpr StaticString(const StaticString& other) noexcept
+        : string(other.string)
+        {}
+        constexpr StaticString& operator=(const StaticString& other) = default;
+
+        constexpr auto data() noexcept
+        {
+            return string.data();
+        }
         constexpr auto data() const noexcept
         {
             return string.data();
@@ -42,19 +52,49 @@ namespace lib {
         {
             return std::string_view(string.data(), string.size());
         }
+        constexpr const char& operator[](std::size_t index) const noexcept
+        {
+            return string[index];
+        }
+        constexpr char& operator[](std::size_t index) noexcept
+        {
+            return string[index];
+        }
+    public:
+        friend std::ostream& operator<<(std::ostream& stream, const StaticString& string)
+        {
+            return stream << std::string_view(string);
+        }
     };
 
     template<std::size_t N>
     StaticString(const char (&string)[N]) -> StaticString<N - 1>;
 
-    template<std::size_t A, std::size_t B>
-    constexpr auto operator+ (const StaticString<A>& a, const StaticString<B>& b) noexcept
+    template<std::size_t N>
+    constexpr auto string(const char (&str)[N]) noexcept
     {
-        return StaticString<A + B>(lib::concat(a.string, b.string));
+        return StaticString<N - 1>(str);
+    }
+
+    template<std::size_t Lhs, std::size_t Rhs>
+    constexpr auto operator+ (const StaticString<Lhs>& lhs, const StaticString<Rhs>& rhs) noexcept
+    {
+        return StaticString<Lhs + Rhs>(lib::concat(lhs.string, rhs.string));
+    }
+
+    template<std::size_t Lhs, std::size_t Rhs>
+    constexpr auto operator == (const StaticString<Lhs>& lhs, const StaticString<Rhs>& rhs) noexcept
+    {
+        return static_cast<std::string_view>(lhs) == static_cast<std::string_view>(rhs);
+    }
+
+    template<std::size_t Lhs, std::size_t Rhs>
+    constexpr auto operator != (const StaticString<Lhs>& lhs, const StaticString<Rhs>& rhs) noexcept
+    {
+        return static_cast<std::string_view>(lhs) != static_cast<std::string_view>(rhs);
     }
 
     namespace details {
-
         constexpr int numDigits(int x) noexcept
         {
             if(x < 0) {
@@ -67,7 +107,6 @@ namespace lib {
                 }
             }
         }
-
     }
 
     template<int Value>

@@ -1,5 +1,6 @@
 #pragma once
 #include <array>
+#include <lib/concept.hpp>
 
 namespace lib {
     namespace details {
@@ -8,7 +9,7 @@ namespace lib {
     }
 
     template<class T, std::size_t ...Ia, std::size_t ...Ib>
-    constexpr auto concat(const std::array<T, sizeof...(Ia)>& a, std::index_sequence<Ia...>, const std::array<T, sizeof...(Ib)>& b, std::index_sequence<Ib...>) noexcept
+    constexpr auto concat_impl(const std::array<T, sizeof...(Ia)>& a, std::index_sequence<Ia...>, const std::array<T, sizeof...(Ib)>& b, std::index_sequence<Ib...>) noexcept
     {
         return std::array<T, sizeof...(Ia) + sizeof...(Ib)>{a[Ia]..., b[Ib]...};
     }
@@ -16,11 +17,11 @@ namespace lib {
     template<class T, std::size_t A, std::size_t B>
     constexpr auto concat(const std::array<T, A>& a, const std::array<T, B>& b) noexcept
     {
-        return concat(a, std::make_index_sequence<A>{}, b, std::make_index_sequence<B>{});
+        return concat_impl(a, std::make_index_sequence<A>{}, b, std::make_index_sequence<B>{});
     }
 
     template<std::size_t ...Ia, std::size_t ...Ib>
-    constexpr auto concat(const std::array<char, sizeof...(Ia)>& a, std::index_sequence<Ia...>, details::RawArray<const char, sizeof...(Ib) + 1u> b, std::index_sequence<Ib...>) noexcept
+    constexpr auto concat_impl(const std::array<char, sizeof...(Ia)>& a, std::index_sequence<Ia...>, details::RawArray<const char, sizeof...(Ib) + 1u> b, std::index_sequence<Ib...>) noexcept
     {
         return std::array<char, sizeof...(Ia) + sizeof...(Ib)>{a[Ia]..., b[Ib]...};
     }
@@ -28,11 +29,11 @@ namespace lib {
     template<std::size_t A, std::size_t B>
     constexpr auto concat(const std::array<char, A>& a, details::RawArray<const char, B> b) noexcept
     {
-        return concat(a, std::make_index_sequence<A>{}, b, std::make_index_sequence<B - 1u>{});
+        return concat_impl(a, std::make_index_sequence<A>{}, b, std::make_index_sequence<B - 1u>{});
     }
 
     template<std::size_t ...Ia, std::size_t ...Ib>
-    constexpr auto concat(details::RawArray<const char, sizeof...(Ia) + 1u> a, std::index_sequence<Ia...>, const std::array<char, sizeof...(Ib)>& b, std::index_sequence<Ib...>) noexcept
+    constexpr auto concat_impl(details::RawArray<const char, sizeof...(Ia) + 1u> a, std::index_sequence<Ia...>, const std::array<char, sizeof...(Ib)>& b, std::index_sequence<Ib...>) noexcept
     {
         return std::array<char, sizeof...(Ia) + sizeof...(Ib)>{a[Ia]..., b[Ib]...};
     }
@@ -40,10 +41,10 @@ namespace lib {
     template<std::size_t A, std::size_t B>
     constexpr auto concat(details::RawArray<const char, A> a, const std::array<char, B>& b) noexcept
     {
-        return concat(a, std::make_index_sequence<A - 1u>{}, b, std::make_index_sequence<B>{});
+        return concat_impl(a, std::make_index_sequence<A - 1u>{}, b, std::make_index_sequence<B>{});
     }
 
-    template<class Arg, class ...Ts>
+    template<class Arg, class ...Ts, typename = Require<(sizeof...(Ts) > 1u)>>
     constexpr auto concat(const Arg& arg, const Ts& ...args) noexcept
     {
         return concat(arg, concat(args...));
@@ -80,22 +81,70 @@ namespace lib {
     template<class T>
     class span
     {
-        T*          ptr;
-        std::size_t size;
+        T*          m_ptr  = nullptr;
+        std::size_t m_size = 0;
     public:
+        constexpr span() = default;
+
         template<std::size_t N>
         constexpr span(T(&array)[N]) noexcept
-        : ptr(array), size(N)
+        : m_ptr(array), m_size(N)
         {}
         
         template<std::size_t N>
         constexpr span(std::array<T, N>& array) noexcept
-        : ptr(array.data()), size(array.size())
+        : m_ptr(array.data()), m_size(array.size())
         {}
+
+        constexpr span(const span& other) = default;
+        constexpr span& operator=(const span& other) = default;
+
+        constexpr operator span<const T>() const noexcept
+        {
+            return span<const T>(m_ptr, m_size);
+        }
 
         constexpr const T& operator[](std::size_t index) const noexcept
         {
             return m_ptr[index];
+        }
+        constexpr T& operator[](std::size_t index) noexcept
+        {
+            return m_ptr[index];
+        }
+
+        constexpr auto data() noexcept
+        {
+            return m_ptr;
+        }
+        constexpr auto size() noexcept
+        {
+            return m_size;
+        }
+        constexpr auto begin() noexcept
+        {
+            return m_ptr;
+        }
+        constexpr auto end() noexcept
+        {
+            return m_ptr + m_size;
+        }
+
+        constexpr auto data() const noexcept
+        {
+            return m_ptr;
+        }
+        constexpr auto size() const noexcept
+        {
+            return m_size;
+        }
+        constexpr auto begin() const noexcept
+        {
+            return m_ptr;
+        }
+        constexpr auto end() const noexcept
+        {
+            return m_ptr + m_size;
         }
     };
 
@@ -118,6 +167,9 @@ namespace lib {
         constexpr span(std::initializer_list<T> list) noexcept
         : m_ptr(list.begin()), m_size(list.size())
         {}
+
+        constexpr span(const span& other) = default;
+        constexpr span& operator=(const span& other) = default;
 
         constexpr const T& operator[](std::size_t index) const noexcept
         {
