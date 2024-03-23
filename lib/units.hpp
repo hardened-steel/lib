@@ -7,7 +7,6 @@
 #include <lib/static.string.hpp>
 
 namespace lib {
-
     namespace units {
         template<class ...Units>
         struct Multiplying;
@@ -155,7 +154,6 @@ namespace lib {
     }
 
     namespace details::units {
-
         template<class Unit>
         using Canonical = lib::units::Canonical<Unit>;
 

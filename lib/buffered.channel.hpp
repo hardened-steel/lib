@@ -11,45 +11,50 @@ namespace lib {
     /// чем читатель и ему некуда писать новые данные, то приоритет читателя повышается до приоритета писателя.
     /// Нужно так же исправить класс lib::IRange<Channel>.
     template<class T, std::size_t N>
-    class BufferedChannel: public IOChannel<T>
+    class BufferedChannel: public IOChannel<BufferedChannel<T, N>>
     {
         CycleBuffer<T, N> buffer;
+        bool closed_ = false;
         mutable Event ievent;
         mutable Event oevent;
     public:
-        IEvent revent() const noexcept override
+        using Type = T;
+        using REvent = Event;
+        using SEvent = Event;
+    public:
+        Event& revent() const noexcept
         {
             return ievent;
         }
-        T urecv() noexcept override
+        T urecv() noexcept
         {
             auto value = buffer.recv();
             oevent.emit();
             return value;
         }
-        bool rpoll() const noexcept override
+        bool rpoll() const noexcept
         {
             return buffer.rpoll();
         }
-        IEvent sevent() const noexcept override
+        Event& sevent() const noexcept
         {
             return oevent;
         }
-        void usend(T value) noexcept override
+        void usend(T value) noexcept
         {
             buffer.send(std::move(value));
             ievent.emit();
         }
-        bool spoll() const noexcept override
+        bool spoll() const noexcept
         {
             return buffer.spoll() && !closed();
         }
     public:
-        bool closed() const noexcept override
+        bool closed() const noexcept
         {
             return closed_;
         }
-        void close() noexcept override
+        void close() noexcept
         {
             closed_ = true;
             ievent.emit();
@@ -73,7 +78,5 @@ namespace lib {
             oevent.emit();
             ievent.emit();
         }
-    private:
-        bool closed_ = false;
     };
 }

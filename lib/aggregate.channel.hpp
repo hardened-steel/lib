@@ -1,77 +1,98 @@
 #pragma once
-#include <array>
 #include <lib/buffered.channel.hpp>
-#include <lib/mutex.hpp>
+#include <lib/concept.hpp>
 
 namespace lib {
 
-    template<class T, std::size_t Count>
-    class AggregateChannel: public IChannel<T>
+    template<class ...Channels>
+    class AggregateChannel: public IChannel<std::common_type_t<typename Channels::Type ...>>
     {
-        std::array<IChannel<T>*, Count> channels;
-        mutable EventMux<Count> events;
-        mutable std::size_t current;
-    private:
-        template<class IChannel, std::size_t ...I>
-        AggregateChannel(IChannel (&channels)[Count], std::index_sequence<I...>) noexcept
-        : channels{&channels[I]...}
-        , events(channels[I].revent()...)
-        , current(0)
-        {
-        }
     public:
-        template<class ...Types>
-        AggregateChannel(IChannel<Types>& ...channels) noexcept
-        : channels{&channels...}
+        using Type = std::common_type_t<typename Channels::Type ...>;
+        using REvent = Event::Mux<typename Channels::REvent& ...>;
+    private:
+        std::tuple<Channels&...> channels;
+        mutable REvent           events;
+        mutable std::size_t      current = 0;
+    public:
+        AggregateChannel(Channels& ...channels) noexcept
+        : channels{channels...}
         , events(channels.revent()...)
         , current(0)
-        {
-            static_assert(sizeof...(Types) == Count);
-        }
-        template<class IChannel>
-        AggregateChannel(IChannel (&channels)[Count]) noexcept
-        : AggregateChannel(channels, std::make_index_sequence<Count>{})
-        {
-        }
+        {}
     public:
-        IEvent revent() const noexcept override
+        bool rpoll() const noexcept
+        {
+            return rpoll(std::make_index_sequence<sizeof...(Channels)>{});
+        }
+
+        bool closed() const noexcept
+        {
+            return closed(std::make_index_sequence<sizeof...(Channels)>{});
+        }
+
+        void close() noexcept
+        {
+            close(std::make_index_sequence<sizeof...(Channels)>{});
+        }
+
+        REvent& revent() const noexcept
         {
             return events;
         }
-        T urecv() override
+
+        Type urecv()
         {
-            return channels[current]->urecv();
+            return urecv(std::make_index_sequence<sizeof...(Channels)>{});
         }
-        bool rpoll() const noexcept override
+    private:
+        template<std::size_t ...I>
+        bool rpoll(std::index_sequence<I...>) const noexcept
         {
-            for(std::size_t i = 0; i < Count; ++i) {
+            using PollFn = bool (*)(const AggregateChannel*);
+            static const std::array<PollFn, sizeof...(Channels)> poll {
+                [](const AggregateChannel* channel) {
+                    return std::get<I>(channel->channels).rpoll();
+                }...
+            };
+
+            for (std::size_t i = 0; i < sizeof...(Channels); ++i) {
                 current += 1;
-                if(current == Count) {
+                if (current == sizeof...(Channels)) {
                     current = 0;
                 }
-                if(channels[current]->rpoll()) {
+                if (poll[current](this)) {
                     return true;
                 }
             }
             return false;
         }
-        void close() noexcept override
+
+        template<std::size_t ...I>
+        Type urecv(std::index_sequence<I...>)
         {
-            for(auto& channel: channels) {
-                channel->close();
-            }
+            using RecvFn = Type (*)(AggregateChannel*);
+            static const std::array<RecvFn, sizeof...(Channels)> recv {
+                [](AggregateChannel* channel) {
+                    return std::get<I>(channel->channels).urecv();
+                }...
+            };
+            return recv[current](this);
         }
-        bool closed() const noexcept override
+
+        template<std::size_t ...I>
+        unsigned closed(std::index_sequence<I...>) const noexcept
         {
-            for(auto& channel: channels) {
-                if(!channel->closed()) {
-                    return false;
-                }
-            }
-            return true;
+            return (std::get<I>(channels).closed() && ...);
+        }
+
+        template<std::size_t ...I>
+        void close(std::index_sequence<I...>) noexcept
+        {
+            (std::get<I>(channels).close(), ...);
         }
     };
 
-    template<typename T, typename... Types>
-    AggregateChannel(IChannel<T>& channel, IChannel<Types>&... channels) -> AggregateChannel<std::enable_if_t<(std::is_same_v<T, Types> && ...), T>, sizeof...(Types) + 1>;
+    template<class ...Channels>
+    AggregateChannel(Channels& ...channels) -> AggregateChannel<Channels...>;
 }

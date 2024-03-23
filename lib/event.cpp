@@ -34,32 +34,4 @@ namespace lib {
     {
         signal.fetch_and(~bit);
     }
-
-    BEventMux::~BEventMux() noexcept
-    {
-        for(auto& event: events) {
-            event.subscribe(nullptr);
-        }
-    }
-    void BEventMux::subscribe(IHandler* handler) noexcept
-    {
-        for(auto& event: events) {
-            event.subscribe(handler);
-        }
-    }
-    void BEventMux::reset() noexcept
-    {
-        for(auto& event: events) {
-            event.reset();
-        }
-    }
-    bool BEventMux::poll() const noexcept
-    {
-        for(auto& event: events) {
-            if(event.poll()) {
-                return true;
-            }
-        }
-        return false;
-    }
 }

@@ -1,7 +1,7 @@
 #include <lib/channel.hpp>
 
 namespace lib {
-    bool IChannelBase::rwait(IHandler& handler, const IChannelBase& channel) noexcept
+    /*bool IChannelBase::rwait(IHandler& handler, const IChannelBase& channel) noexcept
     {
         IEvent event = channel.revent();
         event.reset();
@@ -25,5 +25,5 @@ namespace lib {
             poll = channel.spoll();
         }
         return poll;
-    }
+    }*/
 }

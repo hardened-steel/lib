@@ -1,12 +1,12 @@
 #pragma once
 #include <atomic>
-#include <array>
+#include <tuple>
 #include <lib/semaphore.hpp>
 #include <lib/buffer.hpp>
 
 namespace lib {
 
-    template<std::size_t N>
+    template<class ...Events>
     class EventMux;
 
     class IHandler
@@ -25,6 +25,47 @@ namespace lib {
         void wait() noexcept override;
     };
 
+    template<class Event>
+    class SubscribeGuard
+    {
+        Event* event;
+    public:
+        template<class Handler>
+        SubscribeGuard(Event& event, Handler& handler) noexcept
+        : event(&event)
+        {
+            event.subscribe(&handler);
+        }
+
+        SubscribeGuard(SubscribeGuard&& other) noexcept
+        : event(other.event)
+        {
+            other.event = nullptr;
+        }
+
+        SubscribeGuard& operator=(SubscribeGuard&& other) noexcept
+        {
+            if (this != &other) {
+                if (event) {
+                    event->subscribe(nullptr);
+                }
+                event = other.event;
+                other.event = nullptr;
+            }
+            return *this;
+        }
+
+        ~SubscribeGuard() noexcept
+        {
+            if (event) {
+                event->subscribe(nullptr);
+            }
+        }
+    };
+
+    template<class Event, class Handler>
+    SubscribeGuard(Event& event, Handler& handler) -> SubscribeGuard<Event>;
+
     class Event
     {
         std::atomic<std::uintptr_t> signal {0};
@@ -34,8 +75,8 @@ namespace lib {
         void subscribe(IHandler* handler) noexcept;
         void reset() noexcept;
     public:
-        template<std::size_t N>
-        using Mux = EventMux<N>;
+        template<class ...Events>
+        using Mux = EventMux<Events...>;
     };
 
     struct EventInterface
@@ -90,46 +131,54 @@ namespace lib {
     class NeverEvent
     {
     public:
-        void emit() noexcept {}
+        void emit() const noexcept {}
         bool poll() const noexcept { return false; }
-        void subscribe(IHandler* handler) noexcept { }
-        void reset() noexcept { }
+        void subscribe(IHandler* handler) const noexcept { }
+        void reset() const noexcept { }
     };
 
-    class BEventMux
+    template<class ...Events>
+    class EventMux
     {
-        std::size_t               counter;
-        lib::buffer::View<IEvent> events;
+        std::tuple<Events&...> events;
+    public:
+        constexpr EventMux(Events& ...events) noexcept
+        : events{events...}
+        {}
+        ~EventMux() noexcept
+        {
+            subscribe(nullptr);
+        }
+
+        void subscribe(IHandler* handler) noexcept
+        {
+            subscribe(handler, std::make_index_sequence<sizeof...(Events)>{});
+        }
+        void reset() noexcept
+        {
+            reset(std::make_index_sequence<sizeof...(Events)>{});
+        }
+        bool poll() const noexcept
+        {
+            return poll(std::make_index_sequence<sizeof...(Events)>{});
+        }
     private:
         template<std::size_t ...I>
-        constexpr BEventMux(IEvent* events, std::index_sequence<I...>) noexcept
-        : counter(0), events(events, sizeof...(I))
-        {}
-    public:
-        template<std::size_t N>
-        constexpr BEventMux(IEvent (&events)[N]) noexcept
-        : BEventMux(events, std::make_index_sequence<N>{})
-        {}
-        template<std::size_t N>
-        constexpr BEventMux(std::array<IEvent, N>& events) noexcept
-        : BEventMux(events.data(), std::make_index_sequence<N>{})
-        {}
-        ~BEventMux() noexcept;
-
-        void subscribe(IHandler* handler) noexcept;
-        void reset() noexcept;
-        bool poll() const noexcept;
-    };
-
-    template<std::size_t N>
-    class EventMux: std::array<IEvent, N>, public BEventMux
-    {
-    public:
-        template<class ...Events>
-        constexpr EventMux(Events&& ...events) noexcept
-        : std::array<IEvent, N>{std::forward<Events>(events)...}, BEventMux(static_cast<std::array<IEvent, N>&>(*this))
-        {}
+        void subscribe(IHandler* handler, std::index_sequence<I...>) noexcept
+        {
+            (std::get<I>(events).subscribe(handler), ...);
+        }
+        template<std::size_t ...I>
+        void reset(std::index_sequence<I...>) noexcept
+        {
+            (std::get<I>(events).reset(), ...);
+        }
+        template<std::size_t ...I>
+        bool poll(std::index_sequence<I...>) const noexcept
+        {
+            return (std::get<I>(events).poll() || ...);
+        }
     };
     template<typename... Events>
-    EventMux(Events&& ...events) -> EventMux<sizeof...(Events)>;
+    EventMux(Events& ...events) -> EventMux<Events...>;
 }

@@ -10,94 +10,148 @@
 
 namespace lib {
 
-    class Channel
+    template<class Channel>
+    class IChannel
     {
     public:
-        virtual void close() noexcept = 0;
-        virtual bool closed() const noexcept = 0;
-        virtual ~Channel() noexcept {}
-    };
-
-    class IChannelBase: public Channel
-    {
-    public:
-        virtual IEvent revent() const noexcept = 0;
-        virtual bool rpoll() const noexcept = 0;
-        static bool rwait(IHandler& handler, const IChannelBase& channel) noexcept;
-    };
-
-    template<class T>
-    class IChannel: public IChannelBase
-    {
-        template<class ...Types>
-        friend class IChannelAny;
-    public:
-        using Type = T;
-    public:
-        virtual T urecv() = 0;
-        void recv(T& value)
+        template<class TChannel>
+        static bool rwait(IHandler& handler, const TChannel& channel) noexcept
         {
-            if (rpoll()) {
-                value = urecv();
-                return;
+            auto& event = channel.revent();
+            event.reset();
+            bool poll = channel.rpoll();
+            while(!poll && (!channel.closed() || event.poll())) {
+                handler.wait();
+                event.reset();
+                poll = channel.rpoll();
             }
-
-            Handler handler;
-            revent().subscribe(&handler);
-
-            if (IChannelBase::rwait(handler, *this)) {
-                value = urecv();
-            }
-            revent().subscribe(nullptr);
+            return poll;
         }
-        T recv()
+
+        auto recv()
         {
-            if (rpoll()) {
-                return urecv();
+            auto& self = *static_cast<Channel*>(this);
+            if (self.rpoll()) {
+                return self.urecv();
             }
 
             Handler handler;
-            revent().subscribe(&handler);
+            SubscribeGuard subscriber(self.revent(), handler);
 
-            if (IChannelBase::rwait(handler, *this)) {
-                revent().subscribe(nullptr);
-                return urecv();
+            if (rwait(handler, self)) {
+                return self.urecv();
             }
             throw std::out_of_range("channel is closed");
         }
     };
 
-    template<class ...Types>
-    class IChannelAny: public IChannel<std::variant<Types...>>
+    template<class T>
+    class VIChannel: public IChannel<VIChannel<T>>
     {
-        std::tuple<IChannel<Types>&...>       channels;
-        mutable Event::Mux<sizeof...(Types)>  events;
-        mutable std::bitset<sizeof...(Types)> states;
+        struct Interface
+        {
+            T      (*urecv)(void* channel) noexcept;
+            void   (*close)(void* channel) noexcept;
+            bool   (*closed)(const void* channel) noexcept;
+            bool   (*rpoll) (const void* channel) noexcept;
+        };
+    private:
+        const Interface* interface = nullptr;
+        void* channel = nullptr;
+        mutable IEvent event;
     public:
-        constexpr IChannelAny(IChannel<Types>&... channels) noexcept
+        using Type = T;
+        using REvent = IEvent;
+    public:
+        template<class Channel>
+        VIChannel(Channel& channel) noexcept
+        : channel(&channel)
+        , event(channel.revent())
+        {
+            static const Interface implement = {
+                [](void* channel) noexcept {
+                    return static_cast<Channel*>(channel)->urecv();
+                },
+                [](void* channel) noexcept {
+                    static_cast<Channel*>(channel)->close();
+                },
+                [](const void* channel) noexcept {
+                    return static_cast<const Channel*>(channel)->closed();
+                },
+                [](const void* channel) noexcept {
+                    return static_cast<const Channel*>(channel)->rpoll();
+                }
+            };
+            interface = &implement;
+        }
+    public:
+        VIChannel(const VIChannel&) = default;
+        VIChannel(VIChannel&&) = default;
+        VIChannel& operator=(const VIChannel&) = default;
+        VIChannel& operator=(VIChannel&&) = default;
+    public:
+        T urecv()
+        {
+            return interface->urecv(channel);
+        }
+
+        void close() noexcept
+        {
+            interface->close(channel);
+        }
+        bool closed() const noexcept
+        {
+            return interface->closed(channel);
+        }
+    
+        IEvent& revent() const noexcept
+        {
+            return event;
+        }
+        bool rpoll() const noexcept
+        {
+            return interface->rpoll(channel);
+        }
+    };
+
+    template<class Channel>
+    VIChannel(Channel& channel) -> VIChannel<typename Channel::Type>;
+
+    template<class ...Channels>
+    class IChannelAny: public IChannel<IChannelAny<Channels...>>
+    {
+    public:
+        using Type = std::variant<typename Channels::Type...>;
+        using REvent = Event::Mux<typename Channels::REvent&...>;
+    private:
+        std::tuple<Channels&...> channels;
+        mutable REvent           events;
+        mutable std::size_t      current = 0;
+    public:
+        constexpr IChannelAny(Channels&... channels) noexcept
         : channels{channels...}
         , events{channels.revent()...}
         {
         }
-        bool rpoll() const noexcept override
+        bool rpoll() const noexcept
         {
-            return rpoll(std::make_index_sequence<sizeof...(Types)>{});
+            return rpoll(std::make_index_sequence<sizeof...(Channels)>{});
         }
-        bool closed() const noexcept override
+        bool closed() const noexcept
         {
-            return closed(std::make_index_sequence<sizeof...(Types)>{});
+            return closed(std::make_index_sequence<sizeof...(Channels)>{});
         }
-        void close() noexcept override
+        void close() noexcept
         {
-            close(std::make_index_sequence<sizeof...(Types)>{});
+            close(std::make_index_sequence<sizeof...(Channels)>{});
         }
-        IEvent revent() const noexcept override
+        REvent& revent() const noexcept
         {
             return events;
         }
-        std::variant<Types...> urecv() override
+        Type urecv()
         {
-            return urecv(std::make_index_sequence<sizeof...(Types)>{});
+            return urecv(std::make_index_sequence<sizeof...(Channels)>{});
         }
     private:
         template<std::size_t ...I>
@@ -115,65 +169,75 @@ namespace lib {
         template<std::size_t ...I>
         bool rpoll(std::index_sequence<I...>) const noexcept
         {
-            if(states.any()) {
-                return true;
+            using PollFn = bool (*)(const IChannelAny*);
+            static const std::array<PollFn, sizeof...(Channels)> poll {
+                [](const IChannelAny* channel) {
+                    return std::get<I>(channel->channels).rpoll();
+                }...
+            };
+
+            for (std::size_t i = 0; i < sizeof...(Channels); ++i) {
+                current += 1;
+                if (current == sizeof...(Channels)) {
+                    current = 0;
+                }
+                if (poll[current](this)) {
+                    return true;
+                }
             }
-            ((states[I] = std::get<I>(channels).rpoll()), ...);
-            return states.any();
+            return false;
         }
         
         template<std::size_t ...I>
-        std::variant<Types...> urecv(std::index_sequence<I...>)
+        Type urecv(std::index_sequence<I...>)
         {
-            for(std::size_t i = 0; i < sizeof...(Types); ++i) {
-                if(states[i]) {
-                    return lib::rswitch(
-                        i,
-                        [this]() noexcept(std::is_nothrow_constructible_v<std::tuple_element_t<I, std::tuple<Types...>>, decltype(std::get<I>(channels).urecv())>)
-                        {
-                            states[I] = false;
-                            return std::variant<Types...>(std::in_place_index<I>, std::get<I>(channels).urecv());
-                        }...
-                    );
-                }
-            }
-            LIB_UNREACHABLE;
+            using RecvFn = Type (*)(IChannelAny*);
+            static const std::array<RecvFn, sizeof...(Channels)> recv {
+                [](IChannelAny* channel) {
+                    return Type(std::in_place_index<I>, std::get<I>(channel->channels).urecv());
+                }...
+            };
+            return recv[current](this);
         }
     };
-    template<typename... Types>
-    IChannelAny(IChannel<Types>&... channels) -> IChannelAny<Types...>;
+    template<typename... Channels>
+    IChannelAny(Channels&... channels) -> IChannelAny<Channels...>;
 
-    template<class ...Types>
-    class IChannelAll: public IChannel<std::tuple<Types...>>
+    template<class ...Channels>
+    class IChannelAll: public IChannel<IChannelAll<Channels...>>
     {
-        std::tuple<IChannel<Types>&...>       channels;
-        mutable Event::Mux<sizeof...(Types)>  events;
-        mutable std::bitset<sizeof...(Types)> states;
     public:
-        constexpr IChannelAll(IChannel<Types>&... channels) noexcept
+        using Type = std::tuple<typename Channels::Type...>;
+        using REvent = Event::Mux<typename Channels::REvent&...>;
+    private:
+        std::tuple<Channels&...>                 channels;
+        mutable REvent                           events;
+        mutable std::bitset<sizeof...(Channels)> states;
+    public:
+        constexpr IChannelAll(Channels&... channels) noexcept
         : channels{channels...}
         , events{channels.revent()...}
         {
         }
-        bool rpoll() const noexcept override
+        bool rpoll() const noexcept
         {
-            return rpoll(std::make_index_sequence<sizeof...(Types)>{});
+            return rpoll(std::make_index_sequence<sizeof...(Channels)>{});
         }
-        bool closed() const noexcept override
+        bool closed() const noexcept
         {
-            return closed(std::make_index_sequence<sizeof...(Types)>{});
+            return closed(std::make_index_sequence<sizeof...(Channels)>{});
         }
-        void close() noexcept override
+        void close() noexcept
         {
-            close(std::make_index_sequence<sizeof...(Types)>{});
+            close(std::make_index_sequence<sizeof...(Channels)>{});
         }
-        IEvent revent() const noexcept override
+        REvent& revent() const noexcept
         {
             return events;
         }
-        std::tuple<Types...> urecv() override
+        Type urecv()
         {
-            return urecv(std::make_index_sequence<sizeof...(Types)>{});
+            return urecv(std::make_index_sequence<sizeof...(Channels)>{});
         }
     private:
         template<std::size_t ...I>
@@ -199,14 +263,14 @@ namespace lib {
         }
 
         template<std::size_t ...I>
-        std::tuple<Types...> urecv(std::index_sequence<I...>)
+        Type urecv(std::index_sequence<I...>)
         {
             states.reset();
             return std::make_tuple(std::get<I>(channels).urecv()...);
         }
     };
-    template<typename... Types>
-    IChannelAll(IChannel<Types>&... channels) -> IChannelAll<Types...>;
+    template<typename... Channels>
+    IChannelAll(Channels&... channels) -> IChannelAll<Channels...>;
 
     template<class Channel>
     class IRange
@@ -214,8 +278,11 @@ namespace lib {
         friend class Iterator;
     private:
         using Value = std::remove_cv_t<std::remove_reference_t<typename Channel::Type>>;
-        Handler  handler;
+
         Channel& channel;
+        Handler  handler;
+        SubscribeGuard<typename Channel::REvent> subscriber;
+        
         std::aligned_storage_t<sizeof(Value), alignof(Value)> value;
     public:
         class Iterator
@@ -230,7 +297,7 @@ namespace lib {
         private:
             void next()
             {
-                if (!range->channel.rpoll() && !IChannelBase::rwait(range->handler, range->channel)) {
+                if (!range->channel.rpoll() && !Channel::rwait(range->handler, range->channel)) {
                     range = nullptr;
                 } else {
                     auto ptr = reinterpret_cast<value_type*>(&range->value);
@@ -277,13 +344,9 @@ namespace lib {
     public:
         constexpr IRange(Channel& channel) noexcept
         : channel(channel)
-        {
-            channel.revent().subscribe(&handler);
-        }
-        ~IRange() noexcept
-        {
-            channel.revent().subscribe(nullptr);
-        }
+        , subscriber(channel.revent(), handler)
+        {}
+
         auto begin()
         {
             return Iterator(this);
@@ -297,71 +360,147 @@ namespace lib {
         IRange& operator=(const IRange& range) = delete;
     };
 
-    template<class T>
-    auto irange(IChannel<T>& channel)
+    template<class Channel>
+    auto irange(Channel& channel)
     {
-        return IRange<IChannel<T>>(channel);
+        return IRange<Channel>(channel);
     }
 
-    class OChannelBase: public Channel
+    template<class Channel>
+    class OChannel
     {
     public:
-        virtual IEvent sevent() const noexcept = 0;
-        virtual bool spoll() const noexcept = 0;
-        static bool swait(IHandler& handler, const OChannelBase& channel) noexcept;
+        template<class TChannel>
+        static bool swait(IHandler& handler, const TChannel& channel) noexcept
+        {
+            auto& event = channel.sevent();
+            event.reset();
+            bool poll = channel.spoll();
+            while(!poll && !channel.closed()) {
+                handler.wait();
+                event.reset();
+                poll = channel.spoll();
+            }
+            return poll;
+        }
+
+        template<class T>
+        void send(T&& value)
+        {
+            auto& self = *static_cast<Channel*>(this);
+            if (self.spoll()) {
+                return self.usend(std::forward<T>(value));
+            }
+            Handler handler;
+            SubscribeGuard subscriber(self.sevent(), handler);
+
+            if (swait(handler, self)) {
+                self.usend(std::forward<T>(value));
+            }
+        }
     };
 
     template<class T>
-    class OChannel: public OChannelBase
+    class VOChannel: public OChannel<VOChannel<T>>
     {
+        struct Interface
+        {
+            void   (*usend)(void* channel, T value) noexcept;
+            void   (*close)(void* channel) noexcept;
+            bool   (*closed)(const void* channel) noexcept;
+            bool   (*spoll) (const void* channel) noexcept;
+        };
+    private:
+        const Interface* interface = nullptr;
+        void* channel = nullptr;
+        mutable IEvent event;
     public:
         using Type = T;
+        using SEvent = IEvent;
     public:
-        virtual void usend(T value) = 0;
-        void send(T value)
+        template<class Channel>
+        VOChannel(Channel& channel) noexcept
+        : channel(&channel)
+        , event(channel.sevent())
         {
-            if (spoll()) {
-                return usend(std::move(value));
-            }
+            static const Interface implement = {
+                [](void* channel, T value) noexcept {
+                    static_cast<Channel*>(channel)->usend(std::move(value));
+                },
+                [](void* channel) noexcept {
+                    static_cast<Channel*>(channel)->close();
+                },
+                [](const void* channel) noexcept {
+                    return static_cast<const Channel*>(channel)->closed();
+                },
+                [](const void* channel) noexcept {
+                    return static_cast<const Channel*>(channel)->spoll();
+                }
+            };
+            interface = &implement;
+        }
+    public:
+        VOChannel(const VOChannel&) = default;
+        VOChannel(VOChannel&&) = default;
+        VOChannel& operator=(const VOChannel&) = default;
+        VOChannel& operator=(VOChannel&&) = default;
+    public:
+        void usend(T value)
+        {
+            interface->usend(channel, value);
+        }
 
-            Handler handler;
-            sevent().subscribe(&handler);
-
-            if (OChannelBase::swait(handler, *this)) {
-                usend(std::move(value));
-            }
-            sevent().subscribe(nullptr);
+        void close() noexcept
+        {
+            interface->close(channel);
+        }
+        bool closed() const noexcept
+        {
+            return interface->closed(channel);
+        }
+    
+        SEvent& sevent() const noexcept
+        {
+            return event;
+        }
+        bool spoll() const noexcept
+        {
+            return interface->spoll(channel);
         }
     };
+
+    template<class Channel>
+    VOChannel(Channel& channel) -> VOChannel<typename Channel::Type>;
 
     template<class T>
     class IOChannel: public IChannel<T>, public OChannel<T>
     {
-    public:
-        using Type = T;
     };
 
     template<class T>
-    class BlackHole: public OChannel<T>
+    class BlackHole: public OChannel<BlackHole<T>>
     {
         mutable NeverEvent event;
     public:
-        IEvent sevent() const noexcept override
+        using Type = T;
+        using SEvent = const NeverEvent;
+    public:
+        SEvent& sevent() const noexcept
         {
             return event;
         }
-        void close() noexcept override {}
-        bool closed() const noexcept override
+        void close() const noexcept {}
+        bool closed() const noexcept
         {
             return false;
         }
-        void usend(T) noexcept override {}
-        bool spoll() const noexcept override
+        void usend(T) const noexcept {}
+        bool spoll() const noexcept
         {
             return true;
         }
     };
 
     template<class T>
-    inline BlackHole<T> blackHole {};
+    const inline BlackHole<T> blackHole {};
 }

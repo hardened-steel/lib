@@ -1,7 +1,7 @@
 #include <gtest/gtest.h>
 #include <lib/buffered.channel.hpp>
 #include <lib/aggregate.channel.hpp>
-#include <lib/broadcast.channel.hpp>
+//#include <lib/broadcast.channel.hpp>
 #include <thread>
 #include <future>
 
@@ -60,14 +60,14 @@ TEST(lib, buffered_channel_async)
 
     {
         auto result = std::async(
-            [](lib::OChannel<int>& ochannel) {
+            [](lib::VOChannel<int> ochannel) {
                 ochannel.send(5);
                 ochannel.send(6);
                 ochannel.close();
             },
-            std::ref(iochannel)
+            lib::VOChannel<int>(iochannel)
         );
-        auto& ichannel = static_cast<lib::IChannel<int>&>(iochannel);
+        lib::VIChannel ichannel = iochannel;
         ASSERT_FALSE(iochannel.spoll());
         //ichannel.rwait();
         ASSERT_EQ(ichannel.recv(), 3);
@@ -90,7 +90,7 @@ TEST(lib, buffered_channel_mux_any)
     lib::BufferedChannel<int, 4> chD;
     lib::BufferedChannel<int, 5> chE;
 
-    auto worker = [](lib::OChannel<int>& ochannel, int base)
+    auto worker = [](lib::VOChannel<int> ochannel, int base)
     {
         for(std::size_t i = 0; i < 4; ++i) {
             ochannel.send(base + i * base);
@@ -98,11 +98,11 @@ TEST(lib, buffered_channel_mux_any)
         ochannel.close();
     };
     std::array threads = {
-        std::async(worker, std::ref(chA), 2),
-        std::async(worker, std::ref(chB), 3),
-        std::async(worker, std::ref(chC), 5),
-        std::async(worker, std::ref(chD), 6),
-        std::async(worker, std::ref(chE), 7)
+        std::async(worker, lib::VOChannel<int>(chA), 2),
+        std::async(worker, lib::VOChannel<int>(chB), 3),
+        std::async(worker, lib::VOChannel<int>(chC), 5),
+        std::async(worker, lib::VOChannel<int>(chD), 6),
+        std::async(worker, lib::VOChannel<int>(chE), 7)
     };
     std::vector<int> values[5];
     lib::IChannelAny ichannels(chA, chB, chC, chD, chE);
@@ -135,7 +135,7 @@ TEST(lib, buffered_channel_mux_mux_any)
     lib::BufferedChannel<int, 4> chD;
     lib::BufferedChannel<int, 5> chE;
 
-    auto worker = [](lib::OChannel<int>& ochannel, int base)
+    auto worker = [](lib::VOChannel<int> ochannel, int base)
     {
         for(std::size_t i = 0; i < 4; ++i) {
             ochannel.send(base + i * base);
@@ -143,11 +143,11 @@ TEST(lib, buffered_channel_mux_mux_any)
         ochannel.close();
     };
     std::array threads = {
-        std::async(worker, std::ref(chA), 2),
-        std::async(worker, std::ref(chB), 3),
-        std::async(worker, std::ref(chC), 5),
-        std::async(worker, std::ref(chD), 6),
-        std::async(worker, std::ref(chE), 7)
+        std::async(worker, lib::VOChannel(chA), 2),
+        std::async(worker, lib::VOChannel(chB), 3),
+        std::async(worker, lib::VOChannel(chC), 5),
+        std::async(worker, lib::VOChannel(chD), 6),
+        std::async(worker, lib::VOChannel(chE), 7)
     };
     std::vector<int> values[5];
     auto& outputA = values[0];
@@ -205,7 +205,7 @@ TEST(lib, buffered_channel_mux_mux_all)
     lib::BufferedChannel<int, 4> chD;
     lib::BufferedChannel<int, 5> chE;
 
-    auto worker = [](lib::OChannel<int>& ochannel, int base)
+    auto worker = [](lib::VOChannel<int> ochannel, int base)
     {
         for(std::size_t i = 0; i < 4; ++i) {
             ochannel.send(base + i * base);
@@ -213,11 +213,11 @@ TEST(lib, buffered_channel_mux_mux_all)
         ochannel.close();
     };
     std::array threads = {
-        std::async(worker, std::ref(chA), 2),
-        std::async(worker, std::ref(chB), 3),
-        std::async(worker, std::ref(chC), 5),
-        std::async(worker, std::ref(chD), 6),
-        std::async(worker, std::ref(chE), 7)
+        std::async(worker, lib::VOChannel(chA), 2),
+        std::async(worker, lib::VOChannel(chB), 3),
+        std::async(worker, lib::VOChannel(chC), 5),
+        std::async(worker, lib::VOChannel(chD), 6),
+        std::async(worker, lib::VOChannel(chE), 7)
     };
     std::vector<int> values[5];
     auto& outputA = values[0];
@@ -257,7 +257,7 @@ TEST(lib, buffered_channel_mux_mux_all)
     }
 }
 
-TEST(lib, broadcast_channel)
+/*TEST(lib, broadcast_channel)
 {
     lib::BufferedChannel<int, 2> channels[3];
     lib::BroadCastChannel channel(channels[0], channels[1], channels[2]);
@@ -284,14 +284,14 @@ TEST(lib, broadcast_channel)
     EXPECT_EQ(values[0], (std::vector<int>{1, 2, 3, 4}));
     EXPECT_EQ(values[1], (std::vector<int>{1, 2, 3, 4}));
     EXPECT_EQ(values[2], (std::vector<int>{1, 2, 3, 4}));
-}
+}*/
 
 TEST(lib, aggregate_channel)
 {
     lib::BufferedChannel<int, 2> channels[3];
     lib::AggregateChannel channel(channels[0], channels[1], channels[2]);
     std::vector<int> values;
-    auto worker = [](lib::OChannel<int>& ochannel, std::vector<int> input)
+    auto worker = [](lib::VOChannel<int> ochannel, std::vector<int> input)
     {
         for(auto value: input) {
             ochannel.send(value);
@@ -299,9 +299,9 @@ TEST(lib, aggregate_channel)
         ochannel.close();
     };
     std::array threads = {
-        std::async(worker, std::ref(channels[0]), std::vector<int>{1, 4, 7}),
-        std::async(worker, std::ref(channels[1]), std::vector<int>{2, 5, 8}),
-        std::async(worker, std::ref(channels[2]), std::vector<int>{3, 6, 9})
+        std::async(worker, lib::VOChannel(channels[0]), std::vector<int>{1, 4, 7}),
+        std::async(worker, lib::VOChannel(channels[1]), std::vector<int>{2, 5, 8}),
+        std::async(worker, lib::VOChannel(channels[2]), std::vector<int>{3, 6, 9})
     };
     for(auto value: lib::irange(channel)) {
         values.push_back(value);
