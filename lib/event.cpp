@@ -26,9 +26,12 @@ namespace lib {
     {
         return signal.load(std::memory_order_relaxed) & bit;
     }
-    void Event::subscribe(IHandler* handler) noexcept
+    std::size_t Event::subscribe(IHandler* handler) noexcept
     {
-        signal.exchange(reinterpret_cast<std::intptr_t>(handler));
+        if (signal.exchange(reinterpret_cast<std::intptr_t>(handler)) & bit) {
+            return 1;
+        }
+        return 0;
     }
     void Event::reset() noexcept
     {
