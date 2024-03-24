@@ -6,9 +6,9 @@ namespace lib {
     {
         semaphore.release();
     }
-    void Handler::wait() noexcept
+    void Handler::wait(std::size_t count) noexcept
     {
-        semaphore.acquire();
+        semaphore.acquire(count);
     }
 
     namespace {
@@ -17,7 +17,7 @@ namespace lib {
     void Event::emit() noexcept
     {
         if (!poll()) {
-            if(auto handler = signal.fetch_or(bit)) {
+            if (auto handler = signal.fetch_or(bit)) {
                 reinterpret_cast<IHandler*>(handler)->notify();
             }
         }
@@ -33,8 +33,11 @@ namespace lib {
         }
         return 0;
     }
-    void Event::reset() noexcept
+    std::size_t Event::reset() noexcept
     {
-        signal.fetch_and(~bit);
+        if (signal.fetch_and(~bit) & bit) {
+            return 1;
+        }
+        return 0;
     }
 }

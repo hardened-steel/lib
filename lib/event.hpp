@@ -14,15 +14,17 @@ namespace lib {
     public:
         virtual void notify() noexcept = 0;
         virtual ~IHandler() noexcept {};
-        virtual void wait() noexcept = 0;
+        virtual void wait(std::size_t count = 1) noexcept = 0;
     };
 
     class Handler: public IHandler
     {
         Semaphore semaphore;
     public:
+        Handler() = default;
+        Handler(const Handler&) = delete;
         void notify() noexcept override;
-        void wait() noexcept override;
+        void wait(std::size_t count = 1) noexcept override;
     };
 
     template<class Event>
@@ -30,11 +32,13 @@ namespace lib {
     {
         Event*      event;
         IHandler* handler;
+        std::size_t count;
     public:
         template<class Handler>
         SubscribeGuard(Event& event, Handler& handler) noexcept
         : event(&event)
         , handler(&handler)
+        , count(0)
         {
             event.subscribe(&handler);
         }
@@ -46,29 +50,21 @@ namespace lib {
             other.event = nullptr;
         }
 
-        SubscribeGuard& operator=(SubscribeGuard&& other) noexcept
+        void reset() noexcept
         {
-            if (this != &other) {
-                if (event) {
-                    auto count = event->subscribe(nullptr);
-                    while(count--) {
-                        handler->wait();
-                    }
-                }
-                event = other.event;
-                handler = other.handler;
-                other.event = nullptr;
-            }
-            return *this;
+            count += event->reset();
+        }
+
+        void wait() noexcept
+        {
+            handler->wait();
+            count -= 1;
         }
 
         ~SubscribeGuard() noexcept
         {
             if (event) {
-                auto count = event->subscribe(nullptr);
-                while(count--) {
-                    handler->wait();
-                }
+                handler->wait(event->subscribe(nullptr) + count);
             }
         }
     };
@@ -83,7 +79,7 @@ namespace lib {
         void emit() noexcept;
         bool poll() const noexcept;
         std::size_t subscribe(IHandler* handler) noexcept;
-        void reset() noexcept;
+        std::size_t reset() noexcept;
     public:
         template<class ...Events>
         using Mux = EventMux<Events...>;
@@ -92,7 +88,7 @@ namespace lib {
     struct EventInterface
     {
         std::size_t (*subscribe)(      void* event, IHandler* handler) noexcept;
-        void        (*reset)    (      void* event)                    noexcept;
+        std::size_t (*reset)    (      void* event)                    noexcept;
         bool        (*poll)     (const void* event)                    noexcept;
     };
 
@@ -110,7 +106,7 @@ namespace lib {
                     return static_cast<Event*>(event)->subscribe(handler);
                 },
                 [](void* event) noexcept {
-                    static_cast<Event*>(event)->reset();
+                    return static_cast<Event*>(event)->reset();
                 },
                 [](const void* event) noexcept {
                     return static_cast<const Event*>(event)->poll();
@@ -132,9 +128,9 @@ namespace lib {
         {
             return interface->subscribe(event, handler);
         }
-        void reset() noexcept
+        std::size_t reset() noexcept
         {
-            interface->reset(event);
+            return interface->reset(event);
         }
     };
 
@@ -144,7 +140,7 @@ namespace lib {
         void emit() const noexcept {}
         bool poll() const noexcept { return false; }
         std::size_t subscribe(IHandler* handler) const noexcept { return 0; }
-        void reset() const noexcept { }
+        std::size_t reset() const noexcept { return 0; }
     };
 
     template<class ...Events>
@@ -164,9 +160,9 @@ namespace lib {
         {
             return subscribe(handler, std::make_index_sequence<sizeof...(Events)>{});
         }
-        void reset() noexcept
+        std::size_t reset() noexcept
         {
-            reset(std::make_index_sequence<sizeof...(Events)>{});
+            return reset(std::make_index_sequence<sizeof...(Events)>{});
         }
         bool poll() const noexcept
         {
@@ -179,9 +175,9 @@ namespace lib {
             return (std::get<I>(events).subscribe(handler) + ...);
         }
         template<std::size_t ...I>
-        void reset(std::index_sequence<I...>) noexcept
+        std::size_t reset(std::index_sequence<I...>) noexcept
         {
-            (std::get<I>(events).reset(), ...);
+            return (std::get<I>(events).reset() + ...);
         }
         template<std::size_t ...I>
         bool poll(std::index_sequence<I...>) const noexcept

@@ -14,15 +14,14 @@ namespace lib {
     class IChannel
     {
     public:
-        template<class TChannel>
-        static bool rwait(IHandler& handler, const TChannel& channel) noexcept
+        template<class Event, class TChannel>
+        static bool rwait(SubscribeGuard<Event>& subsciber, const TChannel& channel) noexcept
         {
-            auto& event = channel.revent();
-            event.reset();
+            subsciber.reset();
             bool poll = channel.rpoll();
-            while(!poll && (!channel.closed() || event.poll())) {
-                handler.wait();
-                event.reset();
+            while(!poll && (!channel.closed())) {
+                subsciber.wait();
+                subsciber.reset();
                 poll = channel.rpoll();
             }
             return poll;
@@ -38,7 +37,7 @@ namespace lib {
             Handler handler;
             SubscribeGuard subscriber(self.revent(), handler);
 
-            if (rwait(handler, self)) {
+            if (rwait(subscriber, self)) {
                 return self.urecv();
             }
             throw std::out_of_range("channel is closed");
@@ -177,12 +176,12 @@ namespace lib {
             };
 
             for (std::size_t i = 0; i < sizeof...(Channels); ++i) {
+                if (poll[current](this)) {
+                    return true;
+                }
                 current += 1;
                 if (current == sizeof...(Channels)) {
                     current = 0;
-                }
-                if (poll[current](this)) {
-                    return true;
                 }
             }
             return false;
@@ -297,7 +296,7 @@ namespace lib {
         private:
             void next()
             {
-                if (!range->channel.rpoll() && !Channel::rwait(range->handler, range->channel)) {
+                if (!Channel::rwait(range->subscriber, range->channel)) {
                     range = nullptr;
                 } else {
                     auto ptr = reinterpret_cast<value_type*>(&range->value);
@@ -370,15 +369,14 @@ namespace lib {
     class OChannel
     {
     public:
-        template<class TChannel>
-        static bool swait(IHandler& handler, const TChannel& channel) noexcept
+        template<class Event, class TChannel>
+        static bool swait(SubscribeGuard<Event>& subscriber, const TChannel& channel) noexcept
         {
-            auto& event = channel.sevent();
-            event.reset();
+            subscriber.reset();
             bool poll = channel.spoll();
             while(!poll && !channel.closed()) {
-                handler.wait();
-                event.reset();
+                subscriber.wait();
+                subscriber.reset();
                 poll = channel.spoll();
             }
             return poll;
@@ -388,13 +386,13 @@ namespace lib {
         void send(T&& value)
         {
             auto& self = *static_cast<Channel*>(this);
-            if (self.spoll()) {
+            if (self.spoll() && false) {
                 return self.usend(std::forward<T>(value));
             }
             Handler handler;
             SubscribeGuard subscriber(self.sevent(), handler);
 
-            if (swait(handler, self)) {
+            if (swait(subscriber, self)) {
                 self.usend(std::forward<T>(value));
             }
         }

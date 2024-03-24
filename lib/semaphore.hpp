@@ -20,19 +20,19 @@ namespace lib {
         : sem(init), max(max)
         {}
     public:
-        void release() noexcept
+        void release(std::size_t count = 1) noexcept
         {
             std::unique_lock locker(mutex);
-            cv.wait(locker, [this] { return sem < max; });
-            sem += 1;
+            cv.wait(locker, [this, count] { return sem + count < max; });
+            sem += count;
             locker.unlock();
             cv.notify_one();
         }
-        void acquire() noexcept
+        void acquire(std::size_t count = 1) noexcept
         {
             std::unique_lock locker(mutex);
-            cv.wait(locker, [this] { return sem > 0; });
-            sem -= 1;
+            cv.wait(locker, [this, count] { return sem >= count; });
+            sem -= count;
             locker.unlock();
             cv.notify_one();
         }

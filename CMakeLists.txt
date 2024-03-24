@@ -3,7 +3,7 @@ project(lib LANGUAGES CXX C VERSION 0.0.1)
 
 LIST(APPEND CMAKE_MODULE_PATH ${CMAKE_SOURCE_DIR}/cmake)
 
-add_compile_options(${CMAKE_CXX_FLAGS} "-fsanitize=memory")
+add_compile_options("/fsanitize=address")
 
 include(FetchContent)
 include(platform)
