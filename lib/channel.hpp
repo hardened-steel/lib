@@ -386,7 +386,7 @@ namespace lib {
         void send(T&& value)
         {
             auto& self = *static_cast<Channel*>(this);
-            if (self.spoll() && false) {
+            if (false && self.spoll()) {
                 return self.usend(std::forward<T>(value));
             }
             Handler handler;

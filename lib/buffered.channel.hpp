@@ -14,7 +14,7 @@ namespace lib {
     class BufferedChannel: public IOChannel<BufferedChannel<T, N>>
     {
         CycleBuffer<T, N> buffer;
-        bool closed_ = false;
+        std::atomic_bool closed_ = false;
         mutable Event ievent;
         mutable Event oevent;
     public:

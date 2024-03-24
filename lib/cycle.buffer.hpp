@@ -96,6 +96,8 @@ namespace lib {
         {
             assert(rpoll());
             assert(rsize() <= N);
+
+            auto tail = this->tail.load();
             auto ptr = reinterpret_cast<T*>(&array[tail]);
             T value = std::move(*ptr);
             ptr->~T();
@@ -103,27 +105,31 @@ namespace lib {
             if(tail == N) {
                 tail = 0;
             }
-            count -= 1;
+            this->tail = tail;
+            --count;
             return value;
         }
         bool rpoll() const noexcept
         {
-            return count != 0;
+            return rsize() > 0;
         }
         void send(T value) noexcept
         {
             assert(spoll());
             assert(wsize() <= N);
+
+            auto head = this->head.load();
             new(&array[head]) T(std::move(value));
             head += 1;
             if(head == N) {
                 head = 0;
             }
-            count += 1;
+            this->head = head;
+            ++count;
         }
         bool spoll() const noexcept
         {
-            return count.load(std::memory_order_relaxed) != N;
+            return wsize() > 0;
         }
     public:
         std::size_t rsize() const noexcept

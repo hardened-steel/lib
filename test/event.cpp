@@ -14,6 +14,7 @@ TEST(lib, event)
         auto result = std::async([&] { a.emit(); });
         handler.wait();
         result.get();
+        mux.subscribe(nullptr);
     }
     {
         ASSERT_FALSE(a.poll());
