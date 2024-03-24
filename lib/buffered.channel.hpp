@@ -58,7 +58,7 @@ namespace lib {
         {
             closed_ = true;
             ievent.emit();
-            //oevent.emit();
+            oevent.emit();
         }
         void open() noexcept
         {
