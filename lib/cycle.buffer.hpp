@@ -102,10 +102,10 @@ namespace lib {
     template<class T, std::size_t N>
     class CycleBuffer
     {
-        alignas(64) std::atomic<size_t> m_recv_index{0};
-        mutable alignas(64) size_t m_send_index_cached{0};
-        alignas(64) std::atomic<size_t> m_send_index{0};
-        mutable alignas(64) size_t m_recv_index_cached{0};
+        alignas(64) std::atomic<std::size_t> m_recv_index{0};
+        alignas(64) mutable std::size_t m_send_index_cached = 0;
+        alignas(64) std::atomic<std::size_t> m_send_index{0};
+        alignas(64) mutable std::size_t m_recv_index_cached = 0;
 
         using Storage = std::aligned_storage_t<sizeof(T), alignof(T)>;
         std::array<Storage, N + 1> array;

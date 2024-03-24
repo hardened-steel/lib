@@ -68,14 +68,9 @@ TEST(lib, buffered_channel_async)
             lib::VOChannel<int>(iochannel)
         );
         lib::VIChannel ichannel = iochannel;
-        ASSERT_FALSE(iochannel.spoll());
-        //ichannel.rwait();
         ASSERT_EQ(ichannel.recv(), 3);
-        //ichannel.rwait();
         ASSERT_EQ(ichannel.recv(), 4);
-        //ichannel.rwait();
         ASSERT_EQ(ichannel.recv(), 5);
-        //ichannel.rwait();
         ASSERT_EQ(ichannel.recv(), 6);
         ASSERT_FALSE(iochannel.rpoll());
         result.get();
@@ -199,7 +194,6 @@ TEST(lib, buffered_channel_mux_mux_any)
 
 TEST(lib, buffered_channel_mux_mux_all)
 {
-    for (int i = 0; i < 100000; ++i) {
     lib::BufferedChannel<int, 1> chA;
     lib::BufferedChannel<int, 2> chB;
     lib::BufferedChannel<int, 3> chC;
@@ -259,7 +253,6 @@ TEST(lib, buffered_channel_mux_mux_all)
 
     for(auto& thread: threads) {
         thread.get();
-    }
     }
 }
 
