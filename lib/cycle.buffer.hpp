@@ -8,6 +8,9 @@ namespace lib {
     template<class T, std::size_t N>
     class CycleBuffer;
 
+    struct CycleBufferEndIterator {};
+    constexpr inline CycleBufferEndIterator cycle_buffer_end = {};
+
     template<class T, std::size_t N>
     class CycleBufferIterator
     {
@@ -78,91 +81,122 @@ namespace lib {
             --(*this);
             return temp;
         }
-        constexpr friend bool operator==(const CycleBufferIterator& a, const CycleBufferIterator& b) noexcept
+        constexpr friend bool operator==(const CycleBufferIterator& it, const CycleBufferEndIterator&) noexcept
         {
-            return a.buffer == b.buffer && a.position == b.position && a.size == b.size;
+            return it.size == 0;
         }
-        constexpr friend bool operator!=(const CycleBufferIterator& a, const CycleBufferIterator& b) noexcept
+        constexpr friend bool operator==(const CycleBufferEndIterator&, const CycleBufferIterator& it) noexcept
         {
-            return a.buffer != b.buffer || a.position != b.position || a.size != b.size;
+            return it.size == 0;
+        }
+        constexpr friend bool operator!=(const CycleBufferIterator& it, const CycleBufferEndIterator&) noexcept
+        {
+            return it.size != 0;
+        }
+        constexpr friend bool operator!=(const CycleBufferEndIterator&, const CycleBufferIterator& it) noexcept
+        {
+            return it.size != 0;
         }
     };
 
     template<class T, std::size_t N>
     class CycleBuffer
     {
+        alignas(64) std::atomic<size_t> m_recv_index{0};
+        mutable alignas(64) size_t m_send_index_cached{0};
+        alignas(64) std::atomic<size_t> m_send_index{0};
+        mutable alignas(64) size_t m_recv_index_cached{0};
+
+        using Storage = std::aligned_storage_t<sizeof(T), alignof(T)>;
+        std::array<Storage, N + 1> array;
     public:
         T recv() noexcept
         {
-            assert(rpoll());
-            assert(rsize() <= N);
-
-            auto tail = this->tail.load();
-            auto ptr = reinterpret_cast<T*>(&array[tail]);
+            const auto recv_index = m_recv_index.load(std::memory_order_relaxed);
+            auto ptr = reinterpret_cast<T*>(&array[recv_index]);
             T value = std::move(*ptr);
             ptr->~T();
-            tail += 1;
-            if(tail == N) {
-                tail = 0;
+
+            auto new_recv_index = recv_index + 1;
+            if (new_recv_index == array.size()) {
+                new_recv_index = 0;
             }
-            this->tail = tail;
-            --count;
+            m_recv_index.store(new_recv_index, std::memory_order_release);
             return value;
         }
         bool rpoll() const noexcept
         {
-            return rsize() > 0;
+            const auto recv_index = m_recv_index.load(std::memory_order_relaxed);
+            if (recv_index == m_send_index_cached) {
+                m_send_index_cached = m_send_index.load(std::memory_order_acquire);
+                if (recv_index == m_send_index_cached) {
+                    return false;
+                }
+            }
+            return true;
         }
         void send(T value) noexcept
         {
-            assert(spoll());
-            assert(wsize() <= N);
-
-            auto head = this->head.load();
-            new(&array[head]) T(std::move(value));
-            head += 1;
-            if(head == N) {
-                head = 0;
+            const auto send_index = m_send_index.load(std::memory_order_relaxed);
+            auto new_send_index = send_index + 1;
+            if (new_send_index == array.size()) {
+                new_send_index = 0;
             }
-            this->head = head;
-            ++count;
+            new(&array[send_index]) T(std::move(value));
+            m_send_index.store(new_send_index, std::memory_order_release);
         }
         bool spoll() const noexcept
         {
-            return wsize() > 0;
+            const auto send_index = m_send_index.load(std::memory_order_relaxed);
+            auto new_send_index = send_index + 1;
+            if (new_send_index == array.size()) {
+                new_send_index = 0;
+            }
+
+            if (new_send_index == m_recv_index_cached) {
+                m_recv_index_cached = m_recv_index.load(std::memory_order_acquire);
+                if (new_send_index == m_recv_index_cached) {
+                    return false;
+                }
+            }
+            return true;
         }
     public:
         std::size_t rsize() const noexcept
         {
-            return count.load(std::memory_order_relaxed);
+            const auto send_index = m_send_index.load(std::memory_order_relaxed);
+            const auto recv_index = m_recv_index.load(std::memory_order_relaxed);
+            if (send_index >= recv_index) {
+                return send_index - recv_index;
+            } else {
+                return array.size() - (recv_index - send_index);
+            }
         }
         std::size_t wsize() const noexcept
         {
-            return N - count.load(std::memory_order_relaxed);
+            const auto send_index = m_send_index.load(std::memory_order_relaxed);
+            const auto recv_index = m_recv_index.load(std::memory_order_relaxed);
+            if (send_index >= recv_index) {
+                return array.size() - (send_index - recv_index) - 1;
+            } else {
+                return recv_index - send_index - 1;
+            }
         }
         void clear() noexcept
         {
-            if(auto count = this->count.load(std::memory_order_relaxed)) {
-                auto tail = this->tail.load(std::memory_order_relaxed);
-                while(count--) {
-                    auto ptr = reinterpret_cast<T*>(&array[tail]);
-                    ptr->~T();
-                    tail += 1;
-                    if(tail == N) {
-                        tail = 0;
-                    }
-                }
+            while(rpoll()) {
+                recv();
             }
         }
     public:
         
-        CycleBufferIterator<const T, N> begin() const noexcept
+        CycleBufferIterator<const T, N + 1> begin() const noexcept
         {
-            return {reinterpret_cast<const T*>(array.data()), tail, count.load(std::memory_order_relaxed)};
+            return {reinterpret_cast<const T*>(array.data()), m_recv_index.load(std::memory_order_relaxed), rsize()};
         }
-        CycleBufferIterator<const T, N> end() const noexcept
+        auto end() const noexcept
         {
-            return {reinterpret_cast<const T*>(array.data()), head, 0};
+            return cycle_buffer_end;
         }
 
         auto cbegin() const noexcept
@@ -174,87 +208,15 @@ namespace lib {
             return end();
         }
 
-        CycleBufferIterator<T, N> begin() noexcept
+        CycleBufferIterator<T, N + 1> begin() noexcept
         {
-            return {reinterpret_cast<T*>(array.data()), tail, count.load(std::memory_order_relaxed)};
+            return {reinterpret_cast<T*>(array.data()), m_recv_index.load(std::memory_order_relaxed), rsize()};
         }
-        CycleBufferIterator<T, N> end() noexcept
+        auto end() noexcept
         {
-            return {reinterpret_cast<T*>(array.data()), head, 0};
-        }
-
-        auto rbegin() noexcept
-        {
-            return std::make_reverse_iterator(end());
-        }
-        auto rend() noexcept
-        {
-            return std::make_reverse_iterator(begin());
+            return cycle_buffer_end;
         }
 
-        auto rbegin() const noexcept
-        {
-            return std::make_reverse_iterator(end());
-        }
-        auto rend() const noexcept
-        {
-            return std::make_reverse_iterator(begin());
-        }
-
-        auto crbegin() const noexcept
-        {
-            return rbegin();
-        }
-        auto crend() const noexcept
-        {
-            return rend();
-        }
-
-        struct MReversed
-        {
-            CycleBuffer& buffer;
-
-            auto begin() noexcept
-            {
-                return buffer.rbegin();
-            }
-            auto end() noexcept
-            {
-                return buffer.rend();
-            }
-        };
-
-        MReversed reverse() noexcept
-        {
-            return {*this};
-        }
-
-        struct CReversed
-        {
-            const CycleBuffer& buffer;
-
-            auto begin() noexcept
-            {
-                return buffer.rbegin();
-            }
-            auto end() noexcept
-            {
-                return buffer.rend();
-            }
-        };
-        
-        CReversed reverse() const noexcept
-        {
-            return {*this};
-        }
-        
-    private:
-        using Storage = std::aligned_storage_t<sizeof(T), alignof(T)>;
-        
-        std::array<Storage, N>   array;
-        std::atomic<std::size_t> head  {0};
-        std::atomic<std::size_t> tail  {0};
-        std::atomic<std::size_t> count {0};
     private:
         static void copy(const CycleBuffer& from, CycleBuffer& to)
         {
@@ -273,7 +235,7 @@ namespace lib {
     public:
         constexpr static std::size_t capacity() noexcept
         {
-            return N;
+            return N + 1;
         }
         CycleBuffer() = default;
         CycleBuffer(const CycleBuffer& other)

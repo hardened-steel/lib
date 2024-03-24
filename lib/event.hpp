@@ -57,15 +57,14 @@ namespace lib {
 
         void wait() noexcept
         {
-            handler->wait(count);
-            count = 0;
+            handler->wait();
+            count -= 1;
         }
 
         ~SubscribeGuard() noexcept
         {
             if (event) {
                 handler->wait(event->subscribe(nullptr) + count);
-                //std::this_thread::sleep_for(std::chrono::microseconds(10));
             }
         }
     };

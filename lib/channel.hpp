@@ -6,7 +6,6 @@
 #include <lib/event.hpp>
 #include <lib/buffer.hpp>
 #include <lib/overload.hpp>
-#include <lib/unreachable.hpp>
 
 namespace lib {
 
@@ -15,16 +14,21 @@ namespace lib {
     {
     public:
         template<class Event, class TChannel>
-        static bool rwait(SubscribeGuard<Event>& subsciber, const TChannel& channel) noexcept
+        static bool rwait(SubscribeGuard<Event>& subscriber, const TChannel& channel) noexcept
         {
-            subsciber.reset();
-            bool poll = channel.rpoll();
-            while(!poll && (!channel.closed())) {
-                subsciber.wait();
-                subsciber.reset();
-                poll = channel.rpoll();
+            subscriber.reset();
+
+            bool closed = channel.closed();
+            bool ready = channel.rpoll();
+
+            while(!closed && !ready) {
+                subscriber.wait();
+                subscriber.reset();
+
+                closed = channel.closed();
+                ready = channel.rpoll();
             }
-            return poll;
+            return ready;
         }
 
         auto recv()
@@ -373,13 +377,18 @@ namespace lib {
         static bool swait(SubscribeGuard<Event>& subscriber, const TChannel& channel) noexcept
         {
             subscriber.reset();
-            bool poll = channel.spoll();
-            while(!poll && !channel.closed()) {
+
+            bool closed = channel.closed();
+            bool ready = channel.spoll();
+
+            while(!closed && !ready) {
                 subscriber.wait();
                 subscriber.reset();
-                poll = channel.spoll();
+
+                closed = channel.closed();
+                ready = channel.spoll();
             }
-            return poll;
+            return ready;
         }
 
         template<class T>

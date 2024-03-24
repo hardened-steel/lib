@@ -19,19 +19,12 @@ namespace lib {
         explicit Semaphore(std::size_t init = 0, std::size_t max = maxsem) noexcept
         : sem(init), max(max)
         {}
-        ~Semaphore() noexcept
-        {
-            if (sem > 0) {
-                std::abort();
-            }
-        }
     public:
         void release(std::size_t count = 1) noexcept
         {
             std::unique_lock locker(mutex);
             cv.wait(locker, [this, count] { return sem + count < max; });
             sem += count;
-            locker.unlock();
             cv.notify_one();
         }
         void acquire(std::size_t count = 1) noexcept
@@ -39,7 +32,6 @@ namespace lib {
             std::unique_lock locker(mutex);
             cv.wait(locker, [this, count] { return sem >= count; });
             sem -= count;
-            locker.unlock();
             cv.notify_one();
         }
         bool try_acquire() noexcept

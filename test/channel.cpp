@@ -199,6 +199,7 @@ TEST(lib, buffered_channel_mux_mux_any)
 
 TEST(lib, buffered_channel_mux_mux_all)
 {
+    for (int i = 0; i < 100000; ++i) {
     lib::BufferedChannel<int, 1> chA;
     lib::BufferedChannel<int, 2> chB;
     lib::BufferedChannel<int, 3> chC;
@@ -246,14 +247,19 @@ TEST(lib, buffered_channel_mux_mux_all)
             }
         );
     }
+    ASSERT_TRUE(ichannels.closed());
     EXPECT_EQ(values[0], (std::vector<int>{2, 4, 6, 8}));
     EXPECT_EQ(values[1], (std::vector<int>{3, 6, 9, 12}));
     EXPECT_EQ(values[2], (std::vector<int>{5, 10, 15, 20}));
     EXPECT_EQ(values[3], (std::vector<int>{6, 12, 18, 24}));
     EXPECT_EQ(values[4], (std::vector<int>{7, 14, 21, 28}));
+    if (values[4].size() < 4) {
+        std::cout << "ahtung" << std::endl;
+    }
 
     for(auto& thread: threads) {
         thread.get();
+    }
     }
 }
 

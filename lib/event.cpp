@@ -17,7 +17,7 @@ namespace lib {
     void Event::emit() noexcept
     {
         if (!poll()) {
-            if (auto handler = signal.fetch_or(bit)) {
+            if (auto handler = signal.fetch_or(bit); handler & ~bit) {
                 reinterpret_cast<IHandler*>(handler)->notify();
             }
         }
