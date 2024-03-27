@@ -28,14 +28,14 @@ namespace lib {
     };
 
     template<class Event>
-    class SubscribeGuard
+    class Subscriber
     {
         Event*      event;
         IHandler* handler;
         std::size_t count;
     public:
         template<class Handler>
-        SubscribeGuard(Event& event, Handler& handler) noexcept
+        Subscriber(Event& event, Handler& handler) noexcept
         : event(&event)
         , handler(&handler)
         , count(0)
@@ -43,7 +43,7 @@ namespace lib {
             event.subscribe(&handler);
         }
 
-        SubscribeGuard(SubscribeGuard&& other) noexcept
+        Subscriber(Subscriber&& other) noexcept
         : event(other.event)
         , handler(other.handler)
         {
@@ -61,7 +61,7 @@ namespace lib {
             count -= 1;
         }
 
-        ~SubscribeGuard() noexcept
+        ~Subscriber() noexcept
         {
             if (event) {
                 handler->wait(event->subscribe(nullptr) + count);
@@ -70,7 +70,7 @@ namespace lib {
     };
 
     template<class Event, class Handler>
-    SubscribeGuard(Event& event, Handler& handler) -> SubscribeGuard<Event>;
+    Subscriber(Event& event, Handler& handler) -> Subscriber<Event>;
 
     class Event
     {

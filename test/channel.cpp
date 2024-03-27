@@ -1,7 +1,7 @@
 #include <gtest/gtest.h>
 #include <lib/buffered.channel.hpp>
 #include <lib/aggregate.channel.hpp>
-//#include <lib/broadcast.channel.hpp>
+#include <lib/broadcast.channel.hpp>
 #include <thread>
 #include <future>
 
@@ -224,6 +224,10 @@ TEST(lib, buffered_channel_mux_mux_all)
     lib::IChannelAll channelsCD(chC, chD);
     lib::IChannelAny ichannels(channelsAB, channelsCD, chE);
 
+    for(const auto& [a, b]: lib::irange(channelsAB)) {
+
+    }
+
     for(const auto result: lib::irange(ichannels)) {
         lib::rswitch(result,
             [&outputA, &outputB](const auto& AB) {
@@ -256,21 +260,21 @@ TEST(lib, buffered_channel_mux_mux_all)
     }
 }
 
-/*TEST(lib, broadcast_channel)
+TEST(lib, broadcast_channel)
 {
     lib::BufferedChannel<int, 2> channels[3];
     lib::BroadCastChannel channel(channels[0], channels[1], channels[2]);
     std::vector<int> values[3];
-    auto worker = [](lib::IChannel<int>& ichannel, std::vector<int>& output)
+    auto worker = [](lib::VIChannel<int> ichannel, std::vector<int>& output)
     {
         for(auto value: lib::irange(ichannel)) {
             output.push_back(value);
         }
     };
     std::array threads = {
-        std::async(worker, std::ref(channels[0]), std::ref(values[0])),
-        std::async(worker, std::ref(channels[1]), std::ref(values[1])),
-        std::async(worker, std::ref(channels[2]), std::ref(values[2]))
+        std::async(worker, lib::VIChannel(channels[0]), std::ref(values[0])),
+        std::async(worker, lib::VIChannel(channels[1]), std::ref(values[1])),
+        std::async(worker, lib::VIChannel(channels[2]), std::ref(values[2]))
     };
     channel.send(1);
     channel.send(2);
@@ -283,7 +287,7 @@ TEST(lib, buffered_channel_mux_mux_all)
     EXPECT_EQ(values[0], (std::vector<int>{1, 2, 3, 4}));
     EXPECT_EQ(values[1], (std::vector<int>{1, 2, 3, 4}));
     EXPECT_EQ(values[2], (std::vector<int>{1, 2, 3, 4}));
-}*/
+}
 
 TEST(lib, aggregate_channel)
 {

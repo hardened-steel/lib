@@ -4,11 +4,11 @@
 
 namespace lib {
 
-    template<class ...Channels>
-    class AggregateChannel: public IChannel<std::common_type_t<typename Channels::Type ...>>
+    template<class T, class ...Channels>
+    class AggregateChannel: public IChannel<AggregateChannel<T, Channels...>>
     {
     public:
-        using Type = std::common_type_t<typename Channels::Type ...>;
+        using Type = T;
         using REvent = Event::Mux<typename Channels::REvent& ...>;
     private:
         std::tuple<Channels&...> channels;
@@ -94,5 +94,5 @@ namespace lib {
     };
 
     template<class ...Channels>
-    AggregateChannel(Channels& ...channels) -> AggregateChannel<Channels...>;
+    AggregateChannel(Channels& ...channels) -> AggregateChannel<std::common_type_t<typename Channels::Type ...>, Channels...>;
 }

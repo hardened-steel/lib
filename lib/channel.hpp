@@ -14,7 +14,7 @@ namespace lib {
     {
     public:
         template<class Event, class TChannel>
-        static bool rwait(SubscribeGuard<Event>& subscriber, const TChannel& channel) noexcept
+        static bool rwait(Subscriber<Event>& subscriber, const TChannel& channel) noexcept
         {
             subscriber.reset();
 
@@ -39,7 +39,7 @@ namespace lib {
             }
 
             Handler handler;
-            SubscribeGuard subscriber(self.revent(), handler);
+            Subscriber subscriber(self.revent(), handler);
 
             if (rwait(subscriber, self)) {
                 return self.urecv();
@@ -284,7 +284,7 @@ namespace lib {
 
         Channel& channel;
         Handler  handler;
-        SubscribeGuard<typename Channel::REvent> subscriber;
+        Subscriber<typename Channel::REvent> subscriber;
         
         std::aligned_storage_t<sizeof(Value), alignof(Value)> value;
     public:
@@ -374,7 +374,7 @@ namespace lib {
     {
     public:
         template<class Event, class TChannel>
-        static bool swait(SubscribeGuard<Event>& subscriber, const TChannel& channel) noexcept
+        static bool swait(Subscriber<Event>& subscriber, const TChannel& channel) noexcept
         {
             subscriber.reset();
 
@@ -395,11 +395,11 @@ namespace lib {
         void send(T&& value)
         {
             auto& self = *static_cast<Channel*>(this);
-            if (false && self.spoll()) {
+            if (self.spoll()) {
                 return self.usend(std::forward<T>(value));
             }
             Handler handler;
-            SubscribeGuard subscriber(self.sevent(), handler);
+            Subscriber subscriber(self.sevent(), handler);
 
             if (swait(subscriber, self)) {
                 self.usend(std::forward<T>(value));

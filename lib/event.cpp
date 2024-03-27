@@ -24,7 +24,7 @@ namespace lib {
     }
     bool Event::poll() const noexcept
     {
-        return signal.load() & bit;
+        return signal.load(std::memory_order_relaxed) & bit;
     }
     std::size_t Event::subscribe(IHandler* handler) noexcept
     {

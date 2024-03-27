@@ -103,16 +103,14 @@ namespace lib {
     class CycleBuffer
     {
         alignas(64) std::atomic<std::size_t> m_recv_index{0};
-        alignas(64) mutable std::size_t m_send_index_cached = 0;
         alignas(64) std::atomic<std::size_t> m_send_index{0};
-        alignas(64) mutable std::size_t m_recv_index_cached = 0;
 
         using Storage = std::aligned_storage_t<sizeof(T), alignof(T)>;
         std::array<Storage, N + 1> array;
     public:
         T recv() noexcept
         {
-            const auto recv_index = m_recv_index.load(std::memory_order_relaxed);
+            const auto recv_index = m_recv_index.load();
             auto ptr = reinterpret_cast<T*>(&array[recv_index]);
             T value = std::move(*ptr);
             ptr->~T();
@@ -121,51 +119,32 @@ namespace lib {
             if (new_recv_index == array.size()) {
                 new_recv_index = 0;
             }
-            m_recv_index.store(new_recv_index, std::memory_order_release);
+            m_recv_index.store(new_recv_index);
             return value;
         }
         bool rpoll() const noexcept
         {
-            const auto recv_index = m_recv_index.load(std::memory_order_relaxed);
-            if (recv_index == m_send_index_cached) {
-                m_send_index_cached = m_send_index.load(std::memory_order_acquire);
-                if (recv_index == m_send_index_cached) {
-                    return false;
-                }
-            }
-            return true;
+            return rsize() > 0;
         }
         void send(T value) noexcept
         {
-            const auto send_index = m_send_index.load(std::memory_order_relaxed);
+            const auto send_index = m_send_index.load();
             auto new_send_index = send_index + 1;
             if (new_send_index == array.size()) {
                 new_send_index = 0;
             }
             new(&array[send_index]) T(std::move(value));
-            m_send_index.store(new_send_index, std::memory_order_release);
+            m_send_index.store(new_send_index);
         }
         bool spoll() const noexcept
         {
-            const auto send_index = m_send_index.load(std::memory_order_relaxed);
-            auto new_send_index = send_index + 1;
-            if (new_send_index == array.size()) {
-                new_send_index = 0;
-            }
-
-            if (new_send_index == m_recv_index_cached) {
-                m_recv_index_cached = m_recv_index.load(std::memory_order_acquire);
-                if (new_send_index == m_recv_index_cached) {
-                    return false;
-                }
-            }
-            return true;
+            return wsize() > 0;
         }
     public:
         std::size_t rsize() const noexcept
         {
-            const auto send_index = m_send_index.load(std::memory_order_relaxed);
-            const auto recv_index = m_recv_index.load(std::memory_order_relaxed);
+            const auto send_index = m_send_index.load();
+            const auto recv_index = m_recv_index.load();
             if (send_index >= recv_index) {
                 return send_index - recv_index;
             } else {
@@ -174,8 +153,8 @@ namespace lib {
         }
         std::size_t wsize() const noexcept
         {
-            const auto send_index = m_send_index.load(std::memory_order_relaxed);
-            const auto recv_index = m_recv_index.load(std::memory_order_relaxed);
+            const auto send_index = m_send_index.load();
+            const auto recv_index = m_recv_index.load();
             if (send_index >= recv_index) {
                 return array.size() - (send_index - recv_index) - 1;
             } else {

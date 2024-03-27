@@ -4,80 +4,67 @@
 #include <lib/mutex.hpp>
 
 namespace lib {
-    template<class T, std::size_t Count>
-    class BroadCastChannel: public OChannel<T>
+    template<class T, class ...Channels>
+    class BroadCastChannel: public OChannel<BroadCastChannel<T, Channels...>>
     {
     public:
-        const std::array<OChannel<T>*, Count> channels;
+        using Type = T;
+        using SEvent = Event::Mux<typename Channels::SEvent& ...>;
     private:
-        mutable EventMux<Count> events;
-        bool closed_;
-    private:
-        template<class OChannel, std::size_t ...I>
-        BroadCastChannel(OChannel (&channels)[Count], std::index_sequence<I...>) noexcept
-        : channels{&channels[I]...}
-        , events(channels[I].sevent()...)
-        , closed_(false)
-        {
-        }
-        template<std::size_t ...I>
-        BroadCastChannel(std::array<OChannel<T>*, Count> channels, std::index_sequence<I...>) noexcept
-        : channels{channels[I]...}
-        , events(channels[I]->sevent()...)
-        , closed_(false)
-        {
-        }
+        std::tuple<Channels&...> channels;
+        mutable SEvent events;
     public:
-        template<class ...Types>
-        BroadCastChannel(OChannel<Types>& ...channels) noexcept
-        : channels{&channels...}
+        BroadCastChannel(Channels& ...channels) noexcept
+        : channels{channels...}
         , events(channels.sevent()...)
-        , closed_(false)
-        {
-            static_assert(sizeof...(Types) == Count);
-        }
-        template<class OChannel>
-        BroadCastChannel(OChannel (&channels)[Count]) noexcept
-        : BroadCastChannel(channels, std::make_index_sequence<Count>{})
-        {
-        }
-        BroadCastChannel(std::array<OChannel<T>*, Count> channels) noexcept
-        : BroadCastChannel(channels, std::make_index_sequence<Count>{})
-        {
-        }
+        {}
     public:
-        IEvent sevent() const noexcept override
+        SEvent& sevent() const noexcept
         {
             return events;
         }
-        void usend(T value) override
+        void usend(T value)
         {
-            for(auto& channel: channels) {
-                channel->usend(value);
-            }
+            usend(std::move(value), std::make_index_sequence<sizeof...(Channels)>{});
         }
-        bool spoll() const noexcept override
+        bool spoll() const noexcept
         {
-            for(auto& channel: channels) {
-                if(!channel->spoll()) {
-                    return false;
-                }
-            }
-            return true;
+            return spoll(std::make_index_sequence<sizeof...(Channels)>{});
         }
-        void close() noexcept override
+        void close() noexcept
         {
-            for(auto& channel: channels) {
-                channel->close();
-            }
-            closed_ = true;
+            close(std::make_index_sequence<sizeof...(Channels)>{});
         }
-        bool closed() const noexcept override
+        bool closed() const noexcept
         {
-            return closed_;
+            return closed(std::make_index_sequence<sizeof...(Channels)>{});
+        }
+    private:
+        template<std::size_t ...I>
+        bool spoll(std::index_sequence<I...>) const noexcept
+        {
+            return (std::get<I>(channels).spoll() && ...);
+        }
+
+        template<std::size_t ...I>
+        void usend(T value, std::index_sequence<I...>)
+        {
+            (std::get<I>(channels).usend(value), ...);
+        }
+
+        template<std::size_t ...I>
+        unsigned closed(std::index_sequence<I...>) const noexcept
+        {
+            return (std::get<I>(channels).closed() || ...);
+        }
+
+        template<std::size_t ...I>
+        void close(std::index_sequence<I...>) noexcept
+        {
+            (std::get<I>(channels).close(), ...);
         }
     };
 
-    template<typename T, typename... Types>
-    BroadCastChannel(OChannel<T>& channel, OChannel<Types>&... channels) -> BroadCastChannel<std::enable_if_t<(std::is_same_v<T, Types> && ...), T>, sizeof...(Types) + 1>;
+    template<class ...Channels>
+    BroadCastChannel(Channels& ...channels) -> BroadCastChannel<std::common_type_t<typename Channels::Type ...>, Channels...>;
 }
