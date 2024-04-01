@@ -224,10 +224,6 @@ TEST(lib, buffered_channel_mux_mux_all)
     lib::IChannelAll channelsCD(chC, chD);
     lib::IChannelAny ichannels(channelsAB, channelsCD, chE);
 
-    for(const auto& [a, b]: lib::irange(channelsAB)) {
-
-    }
-
     for(const auto result: lib::irange(ichannels)) {
         lib::rswitch(result,
             [&outputA, &outputB](const auto& AB) {
