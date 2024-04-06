@@ -6,7 +6,7 @@ namespace lib::units {
     struct Voltage
     {
         //kg⋅m2⋅s−3⋅A−1
-        using Dimension = Multiply<Mass, Area, Degree<Time, -3>, Degree<ECurrent, -1>>;
+        using Dimension = Multiply<Mass, Area<Metre>, Degree<Second, -3>, Degree<ECurrent, -1>>;
         constexpr static auto name() noexcept
         {
             return string("voltage");

@@ -5,7 +5,7 @@
 namespace lib::units {
     struct Pascal
     {
-        using Dimension = Divide<Newton, Area>;
+        using Dimension = Divide<Newton, Area<Metre>>;
         constexpr static auto name() noexcept
         {
             return string("pressure");

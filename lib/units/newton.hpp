@@ -4,7 +4,7 @@
 namespace lib::units {
     struct Newton
     {
-        using Dimension = Multiply<Mass, Length, Degree<Time, -2>>;
+        using Dimension = Multiply<Mass, Metre, Degree<Second, -2>>;
         constexpr static auto name() noexcept
         {
             return string("force");

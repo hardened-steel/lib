@@ -370,6 +370,46 @@ namespace lib {
 
         template<class UnitA, class UnitB>
         using Divide = Multiply<UnitA, Simplify<Degree<typename UnitB::Dimension, -1>>>;
+
+        template<class UnitA, class UnitB>
+        struct Convert
+        {
+            static_assert(HasCoefficient<Convert<UnitB, UnitA>>);
+            using Coefficient = std::ratio_divide<std::ratio<1>, typename Convert<UnitB, UnitA>::Coefficient>;
+        };
+
+        template<class Unit>
+        struct Convert<Unit, Unit>
+        {
+            using Coefficient = std::ratio<1, 1>;
+        };
+
+        template<class UnitA, class UnitB, int P>
+        struct Convert<TDegree<UnitA, P>, TDegree<UnitB, P>>
+        {
+            using Coefficient = typename Convert<UnitA, UnitB>::Coefficient;
+        };
+
+        template<class UnitA, class ...UnitsA, class UnitB, class ...UnitsB>
+        struct Convert<Multiplying<UnitA, UnitsA...>, Multiplying<UnitB, UnitsB...>>
+        {
+            using Coefficient = std::ratio_multiply<
+                typename Convert<UnitA, UnitB>::Coefficient,
+                typename Convert<Multiplying<UnitsA...>, Multiplying<UnitsB...>>::Coefficient
+            >;
+        };
+
+        template<class UnitA, class UnitB>
+        struct Convert<Multiplying<UnitA>, Multiplying<UnitB>>
+        {
+            using Coefficient = typename Convert<UnitA, UnitB>::Coefficient;
+        };
+
+        template<class Unit>
+        struct Convert<Multiplying<Unit>, Multiplying<Unit>>
+        {
+            using Coefficient = std::ratio<1, 1>;
+        };
     }
 
     template<class Unit, class T, class Ratio = lib::units::GetCoefficient<Unit>>
@@ -447,14 +487,21 @@ namespace lib {
         }
     }
 
-    template<class ToQuantity, class Unit, class IType, class IRatio>
-    constexpr ToQuantity quantity_cast(const QuantityBase<Unit, IType, IRatio>& quantity) noexcept
+    template<class ToQuantity, class IUnit, class IType, class IRatio>
+    constexpr ToQuantity quantity_cast(const QuantityBase<IUnit, IType, IRatio>& quantity) noexcept
     {
-        static_assert(std::is_same_v<Unit, typename ToQuantity::Unit>);
+        using OUnit = typename ToQuantity::Unit;
         using OType = typename ToQuantity::Type;
         using ORatio = typename ToQuantity::Ratio;
-
-        return ToQuantity(cast<ORatio, OType, IRatio, IType>(quantity.count()));
+        if constexpr (std::is_same_v<IUnit, OUnit>) {
+            return ToQuantity(cast<ORatio, OType, IRatio, IType>(quantity.count()));
+        } else {
+            using Coefficient = typename units::Convert<
+                typename IUnit::Dimension,
+                typename OUnit::Dimension
+            >::Coefficient;
+            return ToQuantity(cast<ORatio, OType, std::ratio_multiply<IRatio, Coefficient>, IType>(quantity.count()));
+        }
     }
 
     template<class U, class T, class R>
@@ -479,13 +526,13 @@ namespace lib {
         : quantity(static_cast<Type>(quantity))
         {}
         template<
-            class Other, class ORatio,
+            class IUnit, class Other, class ORatio,
             typename = lib::Require<
                 std::is_convertible_v<const Other&, Type>,
                 std::is_floating_point_v<Type> || ((std::ratio_divide<ORatio, Ratio>::den == 1) && !std::is_floating_point_v<Other>)
             >
         >
-        constexpr QuantityBase(const QuantityBase<Unit, Other, ORatio>& other) noexcept
+        constexpr QuantityBase(const QuantityBase<IUnit, Other, ORatio>& other) noexcept
         : quantity(quantity_cast<QuantityBase>(other).count())
         {}
         QuantityBase(const QuantityBase&) = default;
@@ -568,11 +615,19 @@ namespace lib {
         );
     }
 
-    template<class Unit, class A, class ARatio, class B, class BRatio>
-    constexpr auto operator== (const Quantity<Unit, A, ARatio>& a, const Quantity<Unit, B, BRatio>& b) noexcept
+    template<class UnitA, class A, class ARatio, class UnitB, class B, class BRatio>
+    constexpr auto operator== (const Quantity<UnitA, A, ARatio>& a, const Quantity<UnitB, B, BRatio>& b) noexcept
     {
-        using CQ = CommonQuantity<Quantity<Unit, A, ARatio>, Quantity<Unit, B, BRatio>>;
-        return CQ(a).count() == CQ(b).count();
+        if constexpr (std::is_same_v<UnitA, UnitB>) {
+            using CQ = CommonQuantity<Quantity<UnitA, A, ARatio>, Quantity<UnitB, B, BRatio>>;
+            return CQ(a).count() == CQ(b).count();
+        } else {
+            using Coefficient = typename units::Convert<
+                typename UnitB::Dimension,
+                typename UnitA::Dimension
+            >::Coefficient;
+            return a == quantity_cast<Quantity<UnitA, A, std::ratio_multiply<ARatio, Coefficient>>>(b);
+        }
     }
 
     template<class Unit, class A, class ARatio, class B, class BRatio>

@@ -2,6 +2,7 @@
 #include <lib/quantity.hpp>
 
 namespace lib::units {
+    template<class Length>
     struct Area
     {
         using Dimension = Degree<Length, 2>;
@@ -11,26 +12,26 @@ namespace lib::units {
         }
         constexpr static auto symbol() noexcept
         {
-            return string("m^2");
+            return Length::symbol() + string("^2");
         }
     };
 
-    template<>
-    struct Dimension<Area::Dimension>
+    template<class Length>
+    struct Dimension<TDegree<Length, 2>>
     {
-        using Type = Area;
+        using Type = Area<Length>;
     };
 
     template<char ...Chars>
     constexpr auto operator ""_m2() noexcept
     {
         using Parser = literal::Parser<Chars...>;
-        return Quantity<Area, typename Parser::Type>(Parser::value);
+        return Quantity<Area<Metre>, typename Parser::Type>(Parser::value);
     }
 
     inline constexpr auto operator ""_m2(long double quantity) noexcept
     {
-        return Quantity<Area, long double>(quantity);
+        return Quantity<Area<Metre>, long double>(quantity);
     }
 
 }

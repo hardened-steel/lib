@@ -56,8 +56,7 @@ namespace lib::units {
 
     struct Rpm
     {
-        using Dimension = Divide<Turn, Time>;
-        using Coefficient = std::ratio<1, 60>;
+        using Dimension = Divide<Turn, Minute>;
         constexpr static auto name() noexcept
         {
             return string("revolutions per minute");
@@ -89,7 +88,6 @@ namespace lib::units {
     struct Mile
     {
         using Dimension = Mile;
-        //using Coefficient = std::ratio<1609344, 1000>;
         constexpr static auto name() noexcept
         {
             return string("Mile");
@@ -101,7 +99,7 @@ namespace lib::units {
     };
 
     template<>
-    struct Convert<Mile, Length>
+    struct Convert<Mile, Metre>
     {
         using Coefficient = std::ratio<1609344, 1000>;
     };
@@ -135,7 +133,7 @@ TEST(lib, units)
     {
         const auto R = 100_ohm;
         // kg⋅m2⋅s−3⋅A−2
-        const auto R2 = (1_kg * 1_m) * (1_m / lib::Quantity<Time, int>(1)) * (1 / (lib::Quantity<Time, int>(1) * (lib::Quantity<Time, int>(1) * 1_A) * 1_A));
+        const auto R2 = (1_kg * 1_m) * (1_m / lib::Quantity<Second, int>(1)) * (1 / (lib::Quantity<Second, int>(1) * (lib::Quantity<Second, int>(1) * 1_A) * 1_A));
         EXPECT_EQ(R2 * 100, R);
         const auto A = 2_m * 3_m;
         const auto P = 12_N / A;
@@ -185,8 +183,9 @@ TEST(lib, units)
         EXPECT_EQ(turns, 5_turn);
     }
     {
-        lib::Quantity speed = 100.0_mile / 1h;
-        lib::Quantity<lib::units::Velocity, float> speed2 = speed;
-        std::cout << lib::type_name<decltype(speed)> << ": " << speed << std::endl;
+        lib::Quantity speed1 = 100.0_mile / 1_h;
+        //lib::Quantity<lib::units::Velocity<Metre>, float> speed2 = speed1;
+        std::cout << lib::type_name<decltype(speed1)> << ": " << speed1 << std::endl;
+        //std::cout << lib::type_name<decltype(speed2)> << ": " << speed2 << std::endl;
     }
 }

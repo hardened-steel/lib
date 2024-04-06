@@ -4,69 +4,172 @@
 
 namespace lib {
     namespace units {
-        struct Time
+        struct Second
         {
-            using Dimension = Time;
+            using Dimension = Second;
             constexpr static auto name() noexcept
             {
-                return string("seconds");
+                return string("second");
             }
             constexpr static auto symbol() noexcept
             {
                 return string("s");
             }
         };
+    
+        struct Minute
+        {
+            using Dimension = Minute;
+            constexpr static auto name() noexcept
+            {
+                return string("minute");
+            }
+            constexpr static auto symbol() noexcept
+            {
+                return string("m");
+            }
+        };
+
+        template<>
+        struct Convert<Minute, Second>
+        {
+            using Coefficient = std::ratio<60>;
+        };
+    
+        struct Hour
+        {
+            using Dimension = Hour;
+            constexpr static auto name() noexcept
+            {
+                return string("hour");
+            }
+            constexpr static auto symbol() noexcept
+            {
+                return string("h");
+            }
+        };
+
+        template<>
+        struct Convert<Hour, Minute>
+        {
+            using Coefficient = std::ratio<60>;
+        };
+
         using namespace std::chrono_literals;
     }
 
     template<class T, class Ratio>
-    class Quantity<units::Time, T, Ratio>: public QuantityBase<units::Time, T, Ratio>
+    class Quantity<units::Second, T, Ratio>: public QuantityBase<units::Second, T, Ratio>
     {
-        using Base = QuantityBase<units::Time, T, Ratio>;
+        using Base = QuantityBase<units::Second, T, Ratio>;
     public:
         using Base::Base;
         using Base::operator=;
         
-        constexpr Quantity(std::chrono::duration<T, Ratio> duration) noexcept
-        : Base(duration.count())
+        template<class IRatio>
+        constexpr Quantity(std::chrono::duration<T, IRatio> duration) noexcept
+        : Quantity(Quantity<units::Second, T, IRatio>(duration.count()))
         {}
-        Quantity& operator=(std::chrono::duration<T, Ratio> duration) noexcept
+
+        template<class IRatio>
+        Quantity& operator=(std::chrono::duration<T, IRatio> duration) noexcept
         {
-            Base::quantity = duration.count();
+            Base::quantity = Quantity<units::Second, T, IRatio>(duration.count());
             return *this;
         }
     public:
-        constexpr operator std::chrono::duration<T, Ratio>() const noexcept
+        constexpr operator std::chrono::duration<T, std::ratio<1>>() const noexcept
         {
-            return {Base::quantity};
+            return {Quantity<units::Second, T>(*this).count()};
         }
     };
 
+    template<class T>
+    Quantity(std::chrono::duration<T, std::ratio<1>>) -> Quantity<units::Second, T, std::ratio<1>>;
+
     template<class T, class Ratio>
-    Quantity(std::chrono::duration<T, Ratio>) -> Quantity<units::Time, T, Ratio>;
+    class Quantity<units::Minute, T, Ratio>: public QuantityBase<units::Minute, T, Ratio>
+    {
+        using Base = QuantityBase<units::Minute, T, Ratio>;
+    public:
+        using Base::Base;
+        using Base::operator=;
+
+        template<class IRatio>
+        constexpr Quantity(std::chrono::duration<T, IRatio> duration) noexcept
+        : Quantity(Quantity<units::Minute, T, IRatio>(duration.count()))
+        {}
+
+        template<class IRatio>
+        Quantity& operator=(std::chrono::duration<T, IRatio> duration) noexcept
+        {
+            Base::quantity = Quantity<units::Minute, T, IRatio>(duration.count());
+            return *this;
+        }
+    public:
+        constexpr operator std::chrono::duration<T, std::chrono::minutes>() const noexcept
+        {
+            return {Quantity<units::Minute, T>(*this).count()};
+        }
+    };
+
+    template<class T>
+    Quantity(std::chrono::duration<T, std::ratio<60>>) -> Quantity<units::Minute, T>;
+
+    template<class T, class Ratio>
+    class Quantity<units::Hour, T, Ratio>: public QuantityBase<units::Hour, T, Ratio>
+    {
+        using Base = QuantityBase<units::Hour, T, Ratio>;
+    public:
+        using Base::Base;
+        using Base::operator=;
+
+        template<class IRatio>
+        constexpr Quantity(std::chrono::duration<T, IRatio> duration) noexcept
+        : Quantity(Quantity<units::Hour, T, IRatio>(duration.count()))
+        {}
+
+        template<class IRatio>
+        Quantity& operator=(std::chrono::duration<T, IRatio> duration) noexcept
+        {
+            Base::quantity = Quantity<units::Hour, T, IRatio>(duration.count());
+            return *this;
+        }
+    public:
+        constexpr operator std::chrono::duration<T, std::chrono::minutes>() const noexcept
+        {
+            return {Quantity<units::Hour, T>(*this).count()};
+        }
+    };
+
+    template<class T>
+    Quantity(std::chrono::duration<T, std::ratio<60 * 60>>) -> Quantity<units::Hour, T>;
+
+    template<class T, class Ratio>
+    Quantity(std::chrono::duration<T, Ratio>) -> Quantity<units::Second, T, Ratio>;
 
     template<class Unit, class A, class RatioA, class B, class RatioB>
     constexpr auto operator* (const Quantity<Unit, A, RatioA>& a, std::chrono::duration<B, RatioB> b) noexcept
     {
-        return a * Quantity<units::Time, B, RatioB>(b);
+        return a * Quantity(b);
     }
 
     template<class Unit, class A, class RatioA, class B, class RatioB>
     constexpr auto operator* (std::chrono::duration<A, RatioA> a, const Quantity<Unit, B, RatioB>& b) noexcept
     {
-        return Quantity<units::Time, A, RatioA>(a) * b;
+        return Quantity(a) * b;
     }
 
     template<class Unit, class A, class RatioA, class B, class RatioB>
     constexpr auto operator/ (const Quantity<Unit, A, RatioA>& a, std::chrono::duration<B, RatioB> b) noexcept
     {
-        return a / Quantity<units::Time, B, RatioB>(b);
+        return a / Quantity(b);
     }
 
     template<class Unit, class A, class RatioA, class B, class RatioB>
     constexpr auto operator/ (std::chrono::duration<A, RatioA> a, const Quantity<Unit, B, RatioB>& b) noexcept
     {
-        return Quantity<units::Time, A, RatioA>(a) / b;
+        return Quantity(a) / b;
     }
 
     namespace units {
@@ -74,72 +177,72 @@ namespace lib {
         constexpr auto operator ""_s() noexcept
         {
             using Parser = literal::Parser<Chars...>;
-            return Quantity<units::Time, typename Parser::Type>(Parser::value);
+            return Quantity<units::Second, typename Parser::Type>(Parser::value);
         }
 
         inline constexpr auto operator ""_s(long double quantity) noexcept
         {
-            return Quantity<units::Time, long double>(quantity);
+            return Quantity<units::Second, long double>(quantity);
         }
 
         template<char ...Chars>
         constexpr auto operator ""_min() noexcept
         {
             using Parser = literal::Parser<Chars...>;
-            return Quantity<units::Time, typename Parser::Type, std::ratio<60>>(Parser::value);
+            return Quantity<units::Minute, typename Parser::Type>(Parser::value);
         }
 
         inline constexpr auto operator ""_min(long double quantity) noexcept
         {
-            return Quantity<units::Time, long double, std::ratio<60>>(quantity);
+            return Quantity<units::Minute, long double>(quantity);
         }
 
         template<char ...Chars>
         constexpr auto operator ""_h() noexcept
         {
             using Parser = literal::Parser<Chars...>;
-            return Quantity<units::Time, typename Parser::Type, std::ratio<60 * 60>>(Parser::value);
+            return Quantity<units::Hour, typename Parser::Type>(Parser::value);
         }
 
         inline constexpr auto operator ""_h(long double quantity) noexcept
         {
-            return Quantity<units::Time, long double, std::ratio<60 * 60>>(quantity);
+            return Quantity<units::Hour, long double>(quantity);
         }
 
         template<char ...Chars>
         constexpr auto operator ""_ms() noexcept
         {
             using Parser = literal::Parser<Chars...>;
-            return Quantity<units::Time, typename Parser::Type, std::milli>(Parser::value);
+            return Quantity<units::Second, typename Parser::Type, std::milli>(Parser::value);
         }
 
         inline constexpr auto operator ""_ms(long double quantity) noexcept
         {
-            return Quantity<units::Time, long double, std::milli>(quantity);
+            return Quantity<units::Second, long double, std::milli>(quantity);
         }
 
         template<char ...Chars>
         constexpr auto operator ""_us() noexcept
         {
             using Parser = literal::Parser<Chars...>;
-            return Quantity<units::Time, typename Parser::Type, std::micro>(Parser::value);
+            return Quantity<units::Second, typename Parser::Type, std::micro>(Parser::value);
         }
 
         inline constexpr auto operator ""_us(long double quantity) noexcept
         {
-            return Quantity<units::Time, long double, std::micro>(quantity);
+            return Quantity<units::Second, long double, std::micro>(quantity);
         }
 
         template<char ...Chars>
         constexpr auto operator ""_ns() noexcept
         {
             using Parser = literal::Parser<Chars...>;
-            return Quantity<units::Time, typename Parser::Type, std::nano>(Parser::value);
+            return Quantity<units::Second, typename Parser::Type, std::nano>(Parser::value);
         }
 
         inline constexpr auto operator ""_ns(long double quantity) noexcept
         {
-            return Quantity<units::Time, long double, std::nano>(quantity);
+            return Quantity<units::Second, long double, std::nano>(quantity);
         }
     }
 }

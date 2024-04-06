@@ -1,26 +1,27 @@
 #pragma once
-#include "lib/units.hpp"
-#include "lib/units/si/length.hpp"
+#include <lib/units.hpp>
+#include <lib/units/si/length.hpp>
 #include <lib/quantity.hpp>
 
 namespace lib::units {
+    template<class Length>
     struct Velocity
     {
-        using Dimension = Divide<Length, Time>;
+        using Dimension = Divide<Length, Second>;
         constexpr static auto name() noexcept
         {
             return string("velocity");
         }
         constexpr static auto symbol() noexcept
         {
-            return string("m/s");
+            return Length::symbol() + string("/s");
         }
     };
 
-    template<>
-    struct Dimension<Velocity::Dimension>
+    template<class Length>
+    struct Dimension<Multiplying<Length, TDegree<Second, -1>>>
     {
-        using Type = Velocity;
+        using Type = Velocity<Length>;
     };
 
 }

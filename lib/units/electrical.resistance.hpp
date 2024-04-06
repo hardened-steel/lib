@@ -7,7 +7,7 @@ namespace lib::units {
     struct EResistance
     {
         //kg⋅m2⋅s−3⋅A−2
-        using Dimension = Multiply<Mass, Area, Degree<Time, -3>, Degree<ECurrent, -2>>;
+        using Dimension = Multiply<Mass, Area<Metre>, Degree<Second, -3>, Degree<ECurrent, -2>>;
         constexpr static auto name() noexcept
         {
             return string("electrical resistance");
