@@ -183,4 +183,53 @@ namespace lib {
     };
     template<typename... Events>
     EventMux(Events& ...events) -> EventMux<Events...>;
+
+    template<class Container>
+    struct MuxContainer {};
+
+    template<class Events>
+    class EventMux<MuxContainer<Events>>
+    {
+        Events& events;
+    public:
+        constexpr explicit EventMux(Events& events) noexcept
+        : events(events)
+        {}
+
+        std::size_t subscribe(IHandler* handler) noexcept
+        {
+            std::size_t count = 0;
+            for (auto& event: events) {
+                count += event.subscribe(handler);
+            }
+            return count;
+        }
+        std::size_t reset() noexcept
+        {
+            std::size_t count = 0;
+            for (auto& event: events) {
+                count += event.reset();
+            }
+            return count;
+        }
+        bool poll() const noexcept
+        {
+            for (auto& event: events) {
+                if (event.poll()) {
+                    return true;
+                }
+            }
+            return false;
+        }
+    };
+
+    template<class T>
+    concept IsContainer = requires(T container)
+    {
+        begin(container);
+        end(container);
+    };
+
+    template<class Container> requires IsContainer<Container>
+    EventMux(Container& container) -> EventMux<MuxContainer<Container>>;
 }

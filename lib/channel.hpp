@@ -10,6 +10,12 @@
 namespace lib {
 
     template<class Channel>
+    struct AsyncRecv
+    {
+        Channel& channel;
+    };
+
+    template<class Channel>
     class IChannel
     {
     public:
@@ -45,6 +51,11 @@ namespace lib {
                 return self.urecv();
             }
             throw std::out_of_range("channel is closed");
+        }
+
+        auto arecv() noexcept
+        {
+            return AsyncRecv<Channel>(*static_cast<Channel*>(this));
         }
     };
 
