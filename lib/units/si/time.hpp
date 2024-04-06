@@ -9,11 +9,11 @@ namespace lib {
             using Dimension = Time;
             constexpr static auto name() noexcept
             {
-                return StaticString("seconds");
+                return string("seconds");
             }
             constexpr static auto symbol() noexcept
             {
-                return StaticString("s");
+                return string("s");
             }
         };
         using namespace std::chrono_literals;

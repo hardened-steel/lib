@@ -4,14 +4,14 @@
 namespace lib::units {
     struct Area
     {
-        using Dimension = Multiply<Length, Length>;
+        using Dimension = Degree<Length, 2>;
         constexpr static auto name() noexcept
         {
-            return StaticString("area");
+            return string("area");
         }
         constexpr static auto symbol() noexcept
         {
-            return StaticString("m^2");
+            return string("m^2");
         }
     };
 

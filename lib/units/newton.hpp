@@ -4,14 +4,14 @@
 namespace lib::units {
     struct Newton
     {
-        using Dimension = Devide<Multiply<Mass, Length>, Degree<Time, 2>>;
+        using Dimension = Multiply<Mass, Length, Degree<Time, -2>>;
         constexpr static auto name() noexcept
         {
-            return StaticString("force");
+            return string("force");
         }
         constexpr static auto symbol() noexcept
         {
-            return StaticString("N");
+            return string("N");
         }
     };
     constexpr inline Unit<Newton> newton {};

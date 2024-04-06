@@ -8,11 +8,11 @@ namespace lib::units {
         using Dimension = Length;
         constexpr static auto name() noexcept
         {
-            return StaticString("length");
+            return string("length");
         }
         constexpr static auto symbol() noexcept
         {
-            return StaticString("m");
+            return string("m");
         }
     };
     constexpr inline Unit<Length> metre {};

@@ -8,11 +8,11 @@ namespace lib::units {
         using Dimension = Mass;
         constexpr static auto name() noexcept
         {
-            return StaticString("mass");
+            return string("mass");
         }
         constexpr static auto symbol() noexcept
         {
-            return StaticString("kg");
+            return string("kg");
         }
     };
     constexpr inline Unit<Mass> kilogram {};

@@ -2,6 +2,7 @@
 #include <limits>
 #include <numeric>
 #include <ratio>
+#include <lib/literal.hpp>
 #include <lib/concept.hpp>
 #include <lib/typename.hpp>
 #include <lib/static.string.hpp>
@@ -21,7 +22,7 @@ namespace lib {
             }
             constexpr static auto symbol() noexcept
             {
-                constexpr StaticString dot(".");
+                constexpr StaticString dot("∙");
                 return Unit::symbol() + ((dot + Units::symbol()) + ...);
             }
         };
@@ -120,36 +121,36 @@ namespace lib {
         };
 
         template<class Unit>
-        struct TSimplefy
+        struct TSimplify
         {
             using Type = Unit;
         };
 
         template<class Unit>
-        using Simplefy = typename TSimplefy<Unit>::Type;
+        using Simplify = typename TSimplify<Unit>::Type;
 
         template<class ...Units>
-        struct TSimplefy<Multiplying<Units...>>
+        struct TSimplify<Multiplying<Units...>>
         {
-            using Type = Multiplying<Simplefy<Units>...>;
+            using Type = Multiplying<Simplify<Units>...>;
         };
 
         template<class Unit, int P>
-        struct TSimplefy<TDegree<Unit, P>>
+        struct TSimplify<TDegree<Unit, P>>
         {
-            using Type = Degree<Simplefy<Unit>, P>;
+            using Type = Degree<Simplify<Unit>, P>;
         };
 
         template<class Unit>
-        struct TSimplefy<TDegree<Unit, 1>>
+        struct TSimplify<TDegree<Unit, 1>>
         {
-            using Type = Simplefy<Unit>;
+            using Type = Simplify<Unit>;
         };
 
         template<class Unit>
-        struct TSimplefy<Multiplying<Unit>>
+        struct TSimplify<Multiplying<Unit>>
         {
-            using Type = Simplefy<Unit>;
+            using Type = Simplify<Unit>;
         };
     }
 
@@ -350,14 +351,14 @@ namespace lib {
                 Canonical<typename Unit::Dimension>,
                 typename TMultiply<Canonical<typename Units::Dimension>...>::Result
             >;
-            using Type = Simplefy<Result>;
+            using Type = Simplify<Result>;
         };
 
         template<class UnitA, class UnitB>
         struct TMultiply<UnitA, UnitB>
         {
             using Result = details::units::Multiply<Canonical<typename UnitA::Dimension>, Canonical<typename UnitB::Dimension>>;
-            using Type = Simplefy<Result>;
+            using Type = Simplify<Result>;
         };
 
         template<>
@@ -368,7 +369,7 @@ namespace lib {
         };
 
         template<class UnitA, class UnitB>
-        using Devide = Multiply<UnitA, Simplefy<Degree<typename UnitB::Dimension, -1>>>;
+        using Divide = Multiply<UnitA, Simplify<Degree<typename UnitB::Dimension, -1>>>;
     }
 
     template<class Unit, class T, class Ratio = lib::units::GetCoefficient<Unit>>
@@ -452,7 +453,7 @@ namespace lib {
         static_assert(std::is_same_v<Unit, typename ToQuantity::Unit>);
         using OType = typename ToQuantity::Type;
         using ORatio = typename ToQuantity::Ratio;
-        
+
         return ToQuantity(cast<ORatio, OType, IRatio, IType>(quantity.count()));
     }
 
@@ -551,7 +552,7 @@ namespace lib {
     template<class AUnit, class A, class ARatio, class BUnit, class B, class BRatio>
     constexpr auto operator/ (const Quantity<AUnit, A, ARatio>& a, const Quantity<BUnit, B, BRatio>& b) noexcept
     {
-        using Unit = typename units::Dimension<units::Devide<AUnit, BUnit>>::Type;
+        using Unit = typename units::Dimension<units::Divide<AUnit, BUnit>>::Type;
         using Type = std::common_type_t<A, B>;
 
         constexpr auto num = std::gcd(ARatio::num, BRatio::den);

@@ -5,6 +5,7 @@
 #include <lib/units/voltage.hpp>
 #include <lib/units/pascal.hpp>
 #include <lib/units/si/time.hpp>
+#include <lib/units/velocity.hpp>
 #include <lib/units.io.hpp>
 #include <gtest/gtest.h>
 #include <lib/quantity.hpp>
@@ -30,13 +31,13 @@ namespace lib::units {
     struct Turn
     {
         using Dimension = Turn;
-        constexpr static std::string_view name() noexcept
+        constexpr static auto name() noexcept
         {
-            return "turns";
+            return string("turns");
         }
-        constexpr static std::string_view symbol() noexcept
+        constexpr static auto symbol() noexcept
         {
-            return "turn";
+            return string("turn");
         }
     };
     constexpr inline Unit<units::Turn> turn {};
@@ -55,15 +56,15 @@ namespace lib::units {
 
     struct Rpm
     {
-        using Dimension = Devide<Turn, Time>;
+        using Dimension = Divide<Turn, Time>;
         using Coefficient = std::ratio<1, 60>;
-        constexpr static std::string_view name() noexcept
+        constexpr static auto name() noexcept
         {
-            return "revolutions per minute";
+            return string("revolutions per minute");
         }
-        constexpr static std::string_view symbol() noexcept
+        constexpr static auto symbol() noexcept
         {
-            return "rpm";
+            return string("rpm");
         }
     };
     template<>
@@ -83,6 +84,38 @@ namespace lib::units {
     inline constexpr auto operator "" _rpm(long double quantity) noexcept
     {
         return Quantity<Rpm, long double>(quantity);
+    }
+
+    struct Mile
+    {
+        using Dimension = Mile;
+        //using Coefficient = std::ratio<1609344, 1000>;
+        constexpr static auto name() noexcept
+        {
+            return string("Mile");
+        }
+        constexpr static auto symbol() noexcept
+        {
+            return string("mile");
+        }
+    };
+
+    template<>
+    struct Convert<Mile, Length>
+    {
+        using Coefficient = std::ratio<1609344, 1000>;
+    };
+
+    template<char ...Chars>
+    constexpr auto operator "" _mile() noexcept
+    {
+        using Parser = literal::Parser<Chars...>;
+        return Quantity<Mile, typename Parser::Type>(Parser::value);
+    }
+
+    inline constexpr auto operator "" _mile(long double quantity) noexcept
+    {
+        return Quantity<Mile, long double>(quantity);
     }
 }
 
@@ -150,5 +183,10 @@ TEST(lib, units)
         auto fanspeed = 100_turn / 2_min;
         auto turns = fanspeed * 6_s;
         EXPECT_EQ(turns, 5_turn);
+    }
+    {
+        lib::Quantity speed = 100.0_mile / 1h;
+        lib::Quantity<lib::units::Velocity, float> speed2 = speed;
+        std::cout << lib::type_name<decltype(speed)> << ": " << speed << std::endl;
     }
 }

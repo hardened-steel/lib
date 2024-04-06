@@ -1,18 +1,20 @@
 #pragma once
 #include <lib/quantity.hpp>
+#include <lib/units/area.hpp>
+#include <lib/units/si/electric.current.hpp>
 
 namespace lib::units {
     struct EResistance
     {
         //kg⋅m2⋅s−3⋅A−2
-        using Dimension = Devide<Multiply<Mass, Length, Length>, Multiply<Time, Time, Time, ECurrent, ECurrent>>;
+        using Dimension = Multiply<Mass, Area, Degree<Time, -3>, Degree<ECurrent, -2>>;
         constexpr static auto name() noexcept
         {
-            return StaticString("electrical resistance");
+            return string("electrical resistance");
         }
         constexpr static auto symbol() noexcept
         {
-            return StaticString("ohm");
+            return string("ohm");
         }
     };
 

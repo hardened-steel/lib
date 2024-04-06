@@ -8,11 +8,11 @@ namespace lib::units {
         using Dimension = LuminousIntensity;
         constexpr static auto name() noexcept
         {
-            return StaticString("candela");
+            return string("candela");
         }
         constexpr static auto symbol() noexcept
         {
-            return StaticString("cd");
+            return string("cd");
         }
     };
     constexpr inline Unit<LuminousIntensity> candela {};

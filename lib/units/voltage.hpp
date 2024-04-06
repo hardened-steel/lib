@@ -1,18 +1,19 @@
 #pragma once
 #include <lib/quantity.hpp>
+#include <lib/units/area.hpp>
 
 namespace lib::units {
     struct Voltage
     {
-        //kg⋅m2⋅s−3⋅A−2
-        using Dimension = Devide<Multiply<Mass, Degree<Length, 2>>, Multiply<Degree<Time, 3>, ECurrent>>;
+        //kg⋅m2⋅s−3⋅A−1
+        using Dimension = Multiply<Mass, Area, Degree<Time, -3>, Degree<ECurrent, -1>>;
         constexpr static auto name() noexcept
         {
-            return StaticString("voltage");
+            return string("voltage");
         }
         constexpr static auto symbol() noexcept
         {
-            return StaticString("V");
+            return string("V");
         }
     };
 

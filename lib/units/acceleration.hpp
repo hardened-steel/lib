@@ -5,14 +5,14 @@
 namespace lib::units {
     struct Acceleration
     {
-        using Dimension = Devide<Velocity, Time>;
+        using Dimension = Divide<Velocity, Time>;
         constexpr static auto name() noexcept
         {
-            return StaticString("acceleration");
+            return string("acceleration");
         }
         constexpr static auto symbol() noexcept
         {
-            return StaticString("m/s^2");
+            return string("m/s^2");
         }
     };
 
