@@ -102,7 +102,7 @@ namespace lib::typetraits {
     }
 
     template<class ...TList>
-    using CreatetSet = typename impl::CreateSetF<TList...>::Result;
+    using CreateSet = typename impl::CreateSetF<TList...>::Result;
 
     namespace impl {
         template<class ...Ts, std::size_t Index>

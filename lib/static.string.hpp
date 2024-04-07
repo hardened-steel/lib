@@ -17,7 +17,7 @@ namespace lib {
     {
         template<std::size_t A, std::size_t B>
         friend constexpr auto operator+ (const StaticString<A>& a, const StaticString<B>& b) noexcept;
-    private:
+    public:
         std::array<char, N> string;
     private:
         template<std::size_t ...I>
@@ -92,6 +92,12 @@ namespace lib {
     constexpr auto operator != (const StaticString<Lhs>& lhs, const StaticString<Rhs>& rhs) noexcept
     {
         return static_cast<std::string_view>(lhs) != static_cast<std::string_view>(rhs);
+    }
+
+    template<std::size_t Lhs, std::size_t Rhs>
+    constexpr auto operator < (const StaticString<Lhs>& lhs, const StaticString<Rhs>& rhs) noexcept
+    {
+        return static_cast<std::string_view>(lhs) < static_cast<std::string_view>(rhs);
     }
 
     namespace details {
