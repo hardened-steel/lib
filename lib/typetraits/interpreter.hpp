@@ -22,10 +22,10 @@ namespace lib::typetraits {
     template<auto Message>
     struct Error;
 
-    template<std::size_t N, const std::array<char, N>* Message>
+    template<std::size_t N, const StaticString<N>* Message>
     struct Error<Message>
     {
-        constexpr static inline const char* message = Message->data(); 
+        constexpr static inline auto message = *Message; 
     };
 
     namespace impl {
@@ -45,7 +45,7 @@ namespace lib::typetraits {
         template<class Variables, class Parent, class VarName, class Value>
         struct CreateVariableF<Context<Variables, Parent>, VarName, Value>
         {
-            constexpr static inline auto message = lib::concat("variable \'", lib::type_name_array<VarName>, "\' already exists in this scope\0");
+            constexpr static inline auto message = "variable \'" + lib::type_name<VarName> + "\' already exists in this scope";
             using Result = If<
                 !exists<Variables, VarName>,
                 Context, List<Insert<Variables, Map<VarName, Value>>, Parent>,
@@ -63,7 +63,7 @@ namespace lib::typetraits {
         struct WriteVariableF<Context<Variables, void>, VarName, Value>
         {
             using NewVariables = Insert<Variables, Map<VarName, Value>>;
-            constexpr static inline auto message = lib::concat("write to undefined variable \'", lib::type_name_array<VarName>, "\'\0");
+            constexpr static inline auto message = "write to undefined variable \'" + lib::type_name<VarName> + "\'";
             using Result = If<
                 exists<Variables, VarName>,
                 Context, List<Insert<Variables, Map<VarName, Value>>, void>,
@@ -96,7 +96,7 @@ namespace lib::typetraits {
         template<class Variables, class VarName>
         struct ReadVariableF<Context<Variables, void>, VarName>
         {
-            constexpr static inline auto message = lib::concat("undefined variable \'", lib::type_name_array<VarName>, "\'\0");
+            constexpr static inline auto message = "undefined variable \'" + lib::type_name<VarName> + "\'";
             using Result = If<
                 exists<Variables, VarName>,
                 Find, List<Variables, VarName>,

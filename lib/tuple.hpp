@@ -54,5 +54,4 @@ namespace lib {
             return std::make_tuple();
         }
     }
-
 }

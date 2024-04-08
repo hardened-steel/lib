@@ -1,8 +1,6 @@
 #pragma once
 #include <lib/array.hpp>
 #include <string_view>
-#include <utility>
-#include <ostream>
 
 namespace lib {
 
@@ -71,6 +69,9 @@ namespace lib {
     StaticString(const char (&string)[N]) -> StaticString<N - 1>;
 
     template<std::size_t N>
+    StaticString(const std::array<char, N>&) -> StaticString<N>;
+
+    template<std::size_t N>
     constexpr auto string(const char (&str)[N]) noexcept
     {
         return StaticString<N - 1>(str);
@@ -79,7 +80,19 @@ namespace lib {
     template<std::size_t Lhs, std::size_t Rhs>
     constexpr auto operator+ (const StaticString<Lhs>& lhs, const StaticString<Rhs>& rhs) noexcept
     {
-        return StaticString<Lhs + Rhs>(lib::concat(lhs.string, rhs.string));
+        return StaticString(lib::concat(lhs.string, rhs.string));
+    }
+
+    template<std::size_t Lhs, std::size_t Rhs>
+    constexpr auto operator+ (const StaticString<Lhs>& lhs, details::RawArray<const char, Rhs> rhs) noexcept
+    {
+        return StaticString(lib::concat(lhs.string, rhs));
+    }
+
+    template<std::size_t Lhs, std::size_t Rhs>
+    constexpr auto operator+ (details::RawArray<const char, Lhs>& lhs, const StaticString<Rhs>& rhs) noexcept
+    {
+        return StaticString(lib::concat(lhs, rhs.string));
     }
 
     template<std::size_t Lhs, std::size_t Rhs>
@@ -89,7 +102,31 @@ namespace lib {
     }
 
     template<std::size_t Lhs, std::size_t Rhs>
+    constexpr auto operator == (const StaticString<Lhs>& lhs, details::RawArray<const char, Rhs> rhs) noexcept
+    {
+        return static_cast<std::string_view>(lhs) == static_cast<std::string_view>(rhs);
+    }
+
+    template<std::size_t Lhs, std::size_t Rhs>
+    constexpr auto operator == (details::RawArray<const char, Lhs>& lhs, const StaticString<Rhs>& rhs) noexcept
+    {
+        return static_cast<std::string_view>(lhs) == static_cast<std::string_view>(rhs);
+    }
+
+    template<std::size_t Lhs, std::size_t Rhs>
     constexpr auto operator != (const StaticString<Lhs>& lhs, const StaticString<Rhs>& rhs) noexcept
+    {
+        return static_cast<std::string_view>(lhs) != static_cast<std::string_view>(rhs);
+    }
+
+    template<std::size_t Lhs, std::size_t Rhs>
+    constexpr auto operator != (const StaticString<Lhs>& lhs, details::RawArray<const char, Rhs> rhs) noexcept
+    {
+        return static_cast<std::string_view>(lhs) != static_cast<std::string_view>(rhs);
+    }
+
+    template<std::size_t Lhs, std::size_t Rhs>
+    constexpr auto operator != (details::RawArray<const char, Lhs>& lhs, const StaticString<Rhs>& rhs) noexcept
     {
         return static_cast<std::string_view>(lhs) != static_cast<std::string_view>(rhs);
     }
