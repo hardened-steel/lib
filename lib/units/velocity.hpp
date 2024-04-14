@@ -4,24 +4,22 @@
 #include <lib/quantity.hpp>
 
 namespace lib::units {
-    template<class Length>
     struct Velocity
     {
-        using Dimension = Divide<Length, Second>;
+        using Dimension = Divide<Metre, Second>;
         constexpr static auto name() noexcept
         {
             return string("velocity");
         }
         constexpr static auto symbol() noexcept
         {
-            return Length::symbol() + string("/s");
+            return string("m/s");
         }
     };
 
-    template<class Length>
-    struct Dimension<Multiplying<Length, TDegree<Second, -1>>>
+    template<>
+    struct Dimension<Velocity::Dimension>
     {
-        using Type = Velocity<Length>;
+        using Type = Velocity;
     };
-
 }

@@ -504,21 +504,21 @@ namespace lib {
     };
 
     template<class Unit, class A, class ARatio, class B, class BRatio>
-    constexpr auto operator+ (const Quantity<Unit, A, ARatio>& a, const Quantity<Unit, B, BRatio>& b) noexcept
+    constexpr auto operator + (const Quantity<Unit, A, ARatio>& a, const Quantity<Unit, B, BRatio>& b) noexcept
     {
         using CQuantity = CommonQuantity<Quantity<Unit, A, ARatio>, Quantity<Unit, B, BRatio>>;
         return CQuantity(CQuantity(a).count() + CQuantity(b).count());
     }
 
     template<class Unit, class A, class ARatio, class B, class BRatio>
-    constexpr auto operator- (const Quantity<Unit, A, ARatio>& a, const Quantity<Unit, B, BRatio>& b) noexcept
+    constexpr auto operator - (const Quantity<Unit, A, ARatio>& a, const Quantity<Unit, B, BRatio>& b) noexcept
     {
         using CQuantity = CommonQuantity<Quantity<Unit, A, ARatio>, Quantity<Unit, B, BRatio>>;
         return CQuantity(CQuantity(a).count() - CQuantity(b).count());
     }
 
     template<class AUnit, class A, class ARatio, class BUnit, class B, class BRatio>
-    constexpr auto operator* (const Quantity<AUnit, A, ARatio>& a, const Quantity<BUnit, B, BRatio>& b) noexcept
+    constexpr auto operator * (const Quantity<AUnit, A, ARatio>& a, const Quantity<BUnit, B, BRatio>& b) noexcept
     {
         using Unit = typename units::TMultiply<typename AUnit::Dimension, typename BUnit::Dimension>::Result;
         using Type = std::common_type_t<A, B>;
@@ -532,7 +532,7 @@ namespace lib {
     }
 
     template<class AUnit, class A, class ARatio, class BUnit, class B, class BRatio>
-    constexpr auto operator/ (const Quantity<AUnit, A, ARatio>& a, const Quantity<BUnit, B, BRatio>& b) noexcept
+    constexpr auto operator / (const Quantity<AUnit, A, ARatio>& a, const Quantity<BUnit, B, BRatio>& b) noexcept
     {
         using Unit = typename units::TMultiply<
             typename AUnit::Dimension,

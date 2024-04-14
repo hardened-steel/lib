@@ -101,6 +101,25 @@ namespace lib::units {
         }
     };
 
+    struct VelocityMPH
+    {
+        using Dimension = Divide<Mile, Hour>;
+        constexpr static auto name() noexcept
+        {
+            return string("velocity");
+        }
+        constexpr static auto symbol() noexcept
+        {
+            return string("mph");
+        }
+    };
+
+    template<>
+    struct Dimension<Multiplying<TDegree<Hour, -1>, Mile>>
+    {
+        using Type = VelocityMPH;
+    };
+
     template<>
     struct Convert<Mile, Metre>
     {
@@ -188,18 +207,8 @@ TEST(lib, units)
     }
     {
         lib::Quantity speed1 = 100.0_mile / 1_h;
-        lib::Quantity<lib::units::Velocity<Metre>, float> speed2 = speed1;
+        lib::Quantity<lib::units::Velocity, float> speed2 = speed1;
         std::cout << lib::type_name<decltype(speed1)> << ": " << speed1 << std::endl;
         std::cout << lib::type_name<decltype(speed2)> << ": " << speed2 << std::endl;
     }
-}
-
-TEST(lib, unitsww)
-{
-    using namespace lib::units;
-    std::cout << lib::type_name<ConvertCoefficient<Second, Minute>> << std::endl;
-    //std::cout << lib::units::can_convert<Mile, lib::units::Metre> << std::endl;
-    //std::cout << lib::type_name<lib::units::Multiply<lib::units::Metre, lib::units::Mass>> << std::endl;
-    //std::cout << lib::type_name<lib::units::Multiply<lib::units::Metre, Mile>> << std::endl;
-    //std::cout << lib::type_name<lib::units::Multiply<lib::units::Multiply<int, float>, double>> << std::endl;
 }
