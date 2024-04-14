@@ -3,12 +3,7 @@
 #include <lib/typetraits/list.hpp>
 
 namespace lib::typetraits {
-
     namespace impl {
-    
-        template<class Value>
-        using Constant = Value;
-
         template<bool Condition, template<class...> class Then, class TParams, template<class...> class Else, class EParams>
         struct IfF;
 
@@ -28,4 +23,15 @@ namespace lib::typetraits {
         };
     }
 
+    template<class Value>
+    using Constant = Value;
+
+    template<auto IValue>
+    struct Value
+    {
+        constexpr static inline auto value = IValue;
+    };
+
+    template<bool Condition, template<class...> class Then, class TParams, template<class...> class Else, class EParams>
+    using If = impl::If<Condition, Then, TParams, Else, EParams>;
 }

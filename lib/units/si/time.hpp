@@ -55,6 +55,12 @@ namespace lib {
             using Coefficient = std::ratio<60>;
         };
 
+        template<>
+        struct Convert<Hour, Second>
+        {
+            using Coefficient = std::ratio<60 * 60>;
+        };
+
         using namespace std::chrono_literals;
     }
 

@@ -1,11 +1,14 @@
 #include <iterator>
 #include <lib/static.string.hpp>
 #include <lib/units.hpp>
+
 #include <lib/units/electrical.resistance.hpp>
 #include <lib/units/voltage.hpp>
 #include <lib/units/pascal.hpp>
 #include <lib/units/si/time.hpp>
 #include <lib/units/velocity.hpp>
+#include <lib/units/area.hpp>
+
 #include <lib/units.io.hpp>
 #include <gtest/gtest.h>
 #include <lib/quantity.hpp>
@@ -179,13 +182,24 @@ TEST(lib, units)
     }
     {
         auto fanspeed = 100_turn / 2_min;
+        std::cout << "fanspeed: " << lib::type_name<decltype(fanspeed)> << " = " << fanspeed.count() << std::endl;
         auto turns = fanspeed * 6_s;
         EXPECT_EQ(turns, 5_turn);
     }
     {
         lib::Quantity speed1 = 100.0_mile / 1_h;
-        //lib::Quantity<lib::units::Velocity<Metre>, float> speed2 = speed1;
+        lib::Quantity<lib::units::Velocity<Metre>, float> speed2 = speed1;
         std::cout << lib::type_name<decltype(speed1)> << ": " << speed1 << std::endl;
-        //std::cout << lib::type_name<decltype(speed2)> << ": " << speed2 << std::endl;
+        std::cout << lib::type_name<decltype(speed2)> << ": " << speed2 << std::endl;
     }
+}
+
+TEST(lib, unitsww)
+{
+    using namespace lib::units;
+    std::cout << lib::type_name<ConvertCoefficient<Second, Minute>> << std::endl;
+    //std::cout << lib::units::can_convert<Mile, lib::units::Metre> << std::endl;
+    //std::cout << lib::type_name<lib::units::Multiply<lib::units::Metre, lib::units::Mass>> << std::endl;
+    //std::cout << lib::type_name<lib::units::Multiply<lib::units::Metre, Mile>> << std::endl;
+    //std::cout << lib::type_name<lib::units::Multiply<lib::units::Multiply<int, float>, double>> << std::endl;
 }

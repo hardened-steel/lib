@@ -8,16 +8,9 @@
 #include <lib/typetraits/map.hpp>
 #include <type_traits>
 
-namespace lib::typetraits {
-
+namespace lib::typetraits::interpreter {
     template<class ...Actions>
     using Scope = List<Actions...>;
-
-    template<auto IValue>
-    struct Value
-    {
-        constexpr static inline auto value = IValue;
-    };
 
     template<auto Message>
     struct Error;
@@ -306,7 +299,7 @@ namespace lib::typetraits {
         template<class Context, class Name>
         struct CalcF
         {
-            using Result = If<
+            using Result = lib::typetraits::If<
                 IsFunction<Name>,
                 Call, List<Name, Context>,
                 ReadVariable, List<Context, Name>
@@ -376,14 +369,14 @@ namespace lib::typetraits {
         using ActionResult = typename Action<Context, Statement>::Result;
 
         template<class Context, class VarName, class Value>
-        struct Action<Context, lib::typetraits::CreateVariable<VarName, Value>>
+        struct Action<Context, lib::typetraits::interpreter::CreateVariable<VarName, Value>>
         {
             using Result = CreateVariable<Context, VarName, Value>;
             static inline constexpr bool Break = false;
         };
 
         template<class Context, class VarName, class Expr>
-        struct Action<Context, lib::typetraits::Write<VarName, Expr>>
+        struct Action<Context, lib::typetraits::interpreter::Write<VarName, Expr>>
         {
             using Value = Calc<Context, Expr>;
             using Result = WriteVariable<Context, VarName, Value>;
@@ -391,17 +384,17 @@ namespace lib::typetraits {
         };
 
         template<class Variables, class Parent, class Expr>
-        struct Action<Context<Variables, Parent>, lib::typetraits::Return<Expr>>
+        struct Action<Context<Variables, Parent>, lib::typetraits::interpreter::Return<Expr>>
         {
             using Result = Calc<Context<Variables, Parent>, Expr>;
             static inline constexpr bool Break = true;
         };
 
         template<class Context, class Condition, class ...Actions>
-        struct Action<Context, lib::typetraits::If<Condition, Actions...>>
+        struct Action<Context, lib::typetraits::interpreter::If<Condition, Actions...>>
         {
             using Value = Calc<Context, Condition>;
-            using IfResult = If<
+            using IfResult = lib::typetraits::If<
                 Value::value,
                 ActionScope, List<Context, Scope<Actions...>>,
                 ActionScope, List<Context, Scope<>>
@@ -412,25 +405,101 @@ namespace lib::typetraits {
         };
 
         template<class Context, class Condition, class ...Actions>
-        struct Action<Context, lib::typetraits::While<Condition, Actions...>>
+        struct Action<Context, lib::typetraits::interpreter::While<Condition, Actions...>>
         {
             using Value = Calc<Context, Condition>;
-            using WhileResult = If<
+            using WhileResult = lib::typetraits::If<
                 Value::value,
                 ActionScope, List<Context, Scope<Actions...>>,
                 ActionScope, List<Context, Scope<>>
             >;
             using Next = CheckContext<WhileResult>;
             static inline constexpr bool Break = Next::Break || !Value::value;
-            using Result = If<
+            using Result = lib::typetraits::If<
                 !Break,
-                ActionResult, List<typename Next::Result, lib::typetraits::While<Condition, Actions...>>,
+                ActionResult, List<typename Next::Result, lib::typetraits::interpreter::While<Condition, Actions...>>,
                 Constant, List<typename Next::Result>
             >;
         };
     }
 
+    namespace impl {
+        struct ForIt;
+
+        template<class List, class Value>
+        struct ListGet;
+
+        template<class List, auto Index>
+        struct ListGet<List, Value<Index>>
+        {
+            using Result = Get<List, Index>;
+        };
+
+        template<class List>
+        struct ListSize
+        {
+            using Result = Value<List::size>;
+        };
+    }
+
+    template<class Var, class List, class ...Actions>
+    using For = If<Value<true>,
+        CreateVariable<impl::ForIt, Value<0>>,
+        While<Not<Eq<impl::ForIt, Value<List::size>>>,
+            /*CreateVariable<Var, impl::ListGet<List, impl::ForIt>>,
+            Actions...,*/
+            Inc<impl::ForIt>
+        >
+    >;
+
     template<class Function>
     using Call = impl::Call<Function, void>;
 
+    struct Function
+    {
+        template<class Function>
+        using Call = lib::typetraits::interpreter::Call<Function>;
+
+        template<class Value>
+        using Dec = lib::typetraits::interpreter::impl::Dec<Value>;
+
+        template<class Value>
+        using Inc = lib::typetraits::interpreter::impl::Inc<Value>;
+
+        template<class Condition, class ...Actions>
+        using If = lib::typetraits::interpreter::If<Condition, Actions...>;
+
+        template<class Condition, class ...Actions>
+        using While = lib::typetraits::interpreter::While<Condition, Actions...>;
+
+        template<class Var, class List, class ...Actions>
+        using For = lib::typetraits::interpreter::For<Var, List, Actions...>;
+
+        template<class Value>
+        using Not = lib::typetraits::interpreter::impl::Not<Value>;
+
+        template<class Lhs, class Rhs>
+        using Mul = lib::typetraits::interpreter::impl::Mul<Lhs, Rhs>;
+
+        template<class Lhs, class Rhs>
+        using Eq = lib::typetraits::interpreter::impl::Eq<Lhs, Rhs>;
+
+        template<class Lhs, class Rhs>
+        using Add = lib::typetraits::interpreter::impl::Add<Lhs, Rhs>;
+
+        template<class Expr>
+        using Return = lib::typetraits::interpreter::Return<Expr>;
+
+        template<class VarName, class Value>
+        using CreateVariable = lib::typetraits::interpreter::CreateVariable<VarName, Value>;
+
+        template<class VarName, class Value>
+        using Write = lib::typetraits::interpreter::Write<VarName, Value>;
+
+        template<class ...Actions>
+        using Scope = lib::typetraits::List<Actions...>;
+
+        template<auto IValue>
+        using Value = lib::typetraits::Value<IValue>;
+    };
 }

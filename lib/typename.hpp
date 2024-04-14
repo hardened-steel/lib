@@ -64,9 +64,9 @@ namespace lib {
         template <auto V>
         constexpr auto get_value_string_impl() noexcept
         {
-            constexpr auto pretty = get_type_name<ValueTag<V>>();
-            constexpr auto prefix = std::string_view{"ValueTag<"};
-            constexpr auto suffix = ">";
+            constexpr std::string_view pretty = lib::type_name<ValueTag<V>>;
+            const auto prefix = std::string_view{"ValueTag<"};
+            const auto suffix = ">";
             
             const auto start = pretty.find(prefix) + prefix.size();
             const auto end = pretty.find(suffix);
@@ -109,5 +109,11 @@ namespace lib {
     struct TypeName<span<T>>
     {
         constexpr static inline auto name = "lib::span<" + type_name<T> + ">";
+    };
+
+    template<std::size_t N>
+    struct TypeName<StaticString<N>>
+    {
+        constexpr static inline auto name = "lib::static.string[" + value_string<N> + "]";
     };
 }

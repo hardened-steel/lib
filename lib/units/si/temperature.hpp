@@ -28,5 +28,4 @@ namespace lib::units {
     {
         return Quantity<Temperature, long double>(quantity);
     }
-
 }

@@ -1,13 +1,99 @@
 #pragma once
 #include <limits>
-#include <numeric>
-#include <ratio>
+#include <lib/numeric.hpp>
+#include <lib/ratio.hpp>
 #include <lib/literal.hpp>
-#include <lib/concept.hpp>
-#include <lib/typename.hpp>
-#include <lib/static.string.hpp>
+#include <lib/typetraits/set.hpp>
 
 namespace lib {
+    namespace details::units {
+        namespace impl {
+            using namespace lib::typetraits;
+        }
+
+        template<class Ratio, class Types>
+        struct Units
+        {
+            using Coefficient = Ratio;
+            using Dimension = Types;
+        };
+
+        namespace impl {
+            template<class Units, class Unit>
+            struct InsertF;
+
+            template<class Units, class Unit>
+            using Insert = typename InsertF<Units, Unit>::Result;
+
+            template<class Ratio, class Unit>
+            struct InsertF<Units<Ratio, typetraits::List<>>, Unit>
+            {
+                using Result = Units<Ratio, typetraits::List<Unit>>;
+            };
+        }
+        
+        template<class Units, class Unit>
+        using Insert = impl::Insert<Units, Unit>;
+
+        namespace impl {
+            template<class Units, class Unit>
+            struct InsertFrontF;
+
+            template<class Units, class Unit>
+            using InsertFront = typename InsertFrontF<Units, Unit>::Result;
+
+            template<class Ratio, class ...Types, class Unit>
+            struct InsertFrontF<Units<Ratio, List<Types...>>, Unit>
+            {
+                using Result = Units<Ratio, List<Unit, Types...>>;
+            };
+        }
+        
+        template<class Units, class Unit>
+        using InsertFront = impl::InsertFront<Units, Unit>;
+
+        namespace impl {
+            template<class Lhs, class Rhs>
+            struct MergeBinaryF;
+
+            template<class Lhs, class Rhs>
+            using MergeBinary = typename MergeBinaryF<Lhs, Rhs>::Result;
+
+            template<class RatioA, class ATypes, class RatioB, class Head, class ...Tail>
+            struct MergeBinaryF<Units<RatioA, ATypes>, Units<RatioB, List<Head, Tail...>>>
+            {
+                using Result = MergeBinary<Insert<Units<RatioA, ATypes>, Head>, Units<RatioB, List<Tail...>>>;
+            };
+
+            template<class RatioA, class ATypes, class RatioB>
+            struct MergeBinaryF<Units<RatioA, ATypes>, Units<RatioB, List<>>>
+            {
+                using Result = Units<std::ratio_multiply<RatioA, RatioB>, ATypes>;
+            };
+
+            template<class ...Units>
+            struct MergeF;
+
+            template<class ...Units>
+            using Merge = typename MergeF<Units...>::Result;
+
+            template<class Lhs, class Head, class ...Tail>
+            struct MergeF<Lhs, Head, Tail...>
+            {
+                using Result = typename MergeF<MergeBinary<Lhs, Head>, Tail...>::Result;
+            };
+
+            template<class Lhs, class Rhs>
+            struct MergeF<Lhs, Rhs>
+            {
+                using Result = MergeBinary<Lhs, Rhs>;
+            };
+        }
+        
+        template<class ...Units>
+        using Merge = impl::Merge<Units...>;
+    }
+
     namespace units {
         template<class ...Units>
         struct Multiplying;
@@ -16,14 +102,15 @@ namespace lib {
         struct Multiplying<Unit, Units...>
         {
             using Dimension = Multiplying;
+            constexpr static inline StaticString<1> dot = "*";
+
             constexpr static auto name() noexcept
             {
-                return StaticString(type_name_array<Multiplying>);
+                return (type_name<Unit> + ... + (dot + type_name<Units>));
             }
             constexpr static auto symbol() noexcept
             {
-                constexpr StaticString dot("∙");
-                return Unit::symbol() + ((dot + Units::symbol()) + ...);
+                return (Unit::symbol() + ... + (dot + Units::symbol()));
             }
         };
 
@@ -33,37 +120,41 @@ namespace lib {
             using Dimension = Multiplying;
         };
 
-        template<class T, int P>
+        template<class Unit, int P>
         struct TDegree
         {
-            using Type = TDegree;
-            using Dimension = Type;
+            using Dimension = TDegree;
+
+            constexpr static auto name() noexcept
+            {
+                return type_name<Unit> + "^" + value_string<P>;
+            }
 
             constexpr static auto symbol() noexcept
             {
-                return (T::symbol() + StaticString("^") + toString<P>());
+                return "(" + Unit::symbol() + "^" + value_string<P> + ")";
             }
         };
 
         template<class T, int P>
-        using Degree = typename TDegree<T, P>::Type;
+        using Degree = typename TDegree<T, P>::Dimension;
 
         template<class T>
         struct TDegree<T, 0>
         {
-            using Type = Multiplying<>;
+            using Dimension = Multiplying<>;
         };
 
         template<class ...Units, int P>
         struct TDegree<Multiplying<Units...>, P>
         {
-            using Type = Multiplying<Degree<Units, P>...>;
+            using Dimension = Multiplying<Degree<Units, P>...>;
         };
 
         template<class T, int P1, int P2>
         struct TDegree<TDegree<T, P1>, P2>
         {
-            using Type = Degree<T, P1 * P2>;
+            using Dimension = Degree<T, P1 * P2>;
         };
 
         template<class Unit>
@@ -82,9 +173,9 @@ namespace lib {
         using HasCoefficientT = typename T::Coefficient;
 
         template<class T>
-        constexpr inline bool HasCoefficient = lib::detect<T, HasCoefficientT>;
+        constexpr inline bool has_coefficient = lib::detect<T, HasCoefficientT>;
 
-        template<class T, bool = HasCoefficient<T>>
+        template<class T, bool = has_coefficient<T>>
         struct GetCoefficientT
         {
             using Result = std::ratio<1>;
@@ -102,314 +193,168 @@ namespace lib {
         template<class Unit>
         struct TCanonical
         {
-            using Type = Multiplying<Degree<Unit, 1>>;
+            using Result = details::units::Units<std::ratio<1>, typetraits::List<Degree<Unit, 1>>>;
         };
 
         template<class Unit>
-        using Canonical = typename TCanonical<Unit>::Type;
+        using Canonical = typename TCanonical<Unit>::Result;
 
         template<class ...Units>
         struct TCanonical<Multiplying<Units...>>
         {
-            using Type = Multiplying<Degree<Units, 1>...>;
+            using Result = details::units::Units<std::ratio<1>, typetraits::List<Degree<Units, 1>...>>;
         };
 
-        template<class Unit, int P>
-        struct TCanonical<TDegree<Unit, P>>
+        template<>
+        struct TCanonical<Multiplying<>>
         {
-            using Type = Multiplying<Degree<Unit, P>>;
+            using Result = details::units::Units<std::ratio<1>, typetraits::List<>>;
         };
 
         template<class Unit>
         struct TSimplify
         {
-            using Type = Unit;
+            using Result = Unit;
         };
 
         template<class Unit>
-        using Simplify = typename TSimplify<Unit>::Type;
+        using Simplify = typename TSimplify<Unit>::Result;
 
-        template<class ...Units>
-        struct TSimplify<Multiplying<Units...>>
+        template<std::intmax_t Num, std::intmax_t Dem, class ...Units>
+        struct TSimplify<details::units::Units<std::ratio<Num, Dem>, typetraits::List<Units...>>>
         {
-            using Type = Multiplying<Simplify<Units>...>;
-        };
-
-        template<class Unit, int P>
-        struct TSimplify<TDegree<Unit, P>>
-        {
-            using Type = Degree<Simplify<Unit>, P>;
+            using Result = Simplify<Multiplying<Simplify<Units>...>>;
         };
 
         template<class Unit>
         struct TSimplify<TDegree<Unit, 1>>
         {
-            using Type = Simplify<Unit>;
+            using Result = Unit;
         };
 
         template<class Unit>
         struct TSimplify<Multiplying<Unit>>
         {
-            using Type = Simplify<Unit>;
+            using Result = Simplify<Unit>;
+        };
+
+        template<class UnitFrom, class UnitTo>
+        struct Convert
+        {
+            using Coefficient = std::conditional_t <
+                std::is_same_v<UnitFrom, UnitTo>,
+                std::ratio<1>,
+                std::ratio<0>
+            >;
+        };
+
+        template<class UnitFrom, class UnitTo>
+        using ConvertCoefficient = std::conditional_t <
+            std::is_same_v<
+                GetCoefficient<Convert<typename UnitFrom::Dimension, typename UnitTo::Dimension>>, std::ratio<0>
+            >,
+            lib::typetraits::If <
+                std::is_same_v<
+                    GetCoefficient<Convert<typename UnitTo::Dimension, typename UnitFrom::Dimension>>, std::ratio<0>
+                >,
+                lib::typetraits::Constant, lib::typetraits::List<std::ratio<0>>,
+                std::ratio_divide, lib::typetraits::List<
+                    std::ratio<1>,
+                    GetCoefficient<Convert<typename UnitTo::Dimension, typename UnitFrom::Dimension>>
+                >
+            >,
+            GetCoefficient<Convert<typename UnitFrom::Dimension, typename UnitTo::Dimension>>
+        >;
+
+        template<class UnitFrom, class UnitTo>
+        constexpr inline bool can_convert = !std::is_same_v<ConvertCoefficient<UnitFrom, UnitTo>, std::ratio<0>>;
+
+        template<class UnitFrom, class UnitTo, int P>
+        struct Convert<TDegree<UnitFrom, P>, TDegree<UnitTo, P>>
+        {
+            using ResultCoefficient = std::conditional_t <
+                std::is_same_v<ConvertCoefficient<UnitFrom, UnitTo>, std::ratio<0>>,
+                lib::typetraits::If <
+                    std::is_same_v<ConvertCoefficient<UnitTo, UnitFrom>, std::ratio<0>>,
+                    lib::typetraits::Constant, lib::typetraits::List<std::ratio<0>>,
+                    std::ratio_divide, lib::typetraits::List<std::ratio<1>, ConvertCoefficient<UnitTo, UnitFrom>>
+                >,
+                ConvertCoefficient<UnitFrom, UnitTo>
+            >;
+
+            template<class Ratio, class Pow>
+            using RatioPow = lib::RatioPow<Ratio, Pow::value>;
+
+            using Coefficient = lib::typetraits::If <
+                std::is_same_v<ResultCoefficient, std::ratio<0>>,
+                lib::typetraits::Constant, lib::typetraits::List<std::ratio<0>>,
+                RatioPow, lib::typetraits::List<ResultCoefficient, lib::typetraits::Value<P>>
+            >;
+        };
+
+        template<class ...UnitsFrom, class ...UnitsTo>
+        struct Convert<Multiplying<UnitsFrom ...>, Multiplying<UnitsTo ...>>
+        {
+            using Unit = lib::details::units::Merge<
+                Canonical<Multiplying<UnitsTo ...>>,
+                Canonical<Simplify<Degree<Multiplying<UnitsFrom ...>, -1>>>
+            >;
+            using Coefficient = std::conditional_t<
+                std::is_same_v<typename Unit::Dimension, lib::typetraits::List<>>,
+                GetCoefficient<Unit>,
+                std::ratio<0>
+            >;
         };
     }
 
-    namespace details::units {
-        template<class Unit>
-        using Canonical = lib::units::Canonical<Unit>;
-
-        template<class ...Units>
-        using Multiplying = lib::units::Multiplying<Units...>;
-
-        template<class T, int P>
-        using Degree = lib::units::Degree<T, P>;
-
-        template<class T, int P>
-        using TDegree = lib::units::TDegree<T, P>;
-
-        template<class UnitsA, class UnitsB>
-        struct TConcat;
-
-        template<class UnitsA, class UnitsB>
-        using Concat = typename TConcat<UnitsA, UnitsB>::Result;
-
-        template<class ...UnitsA, class ...UnitsB>
-        struct TConcat<Multiplying<UnitsA...>, Multiplying<UnitsB...>>
+    namespace details::units::impl {
+        template<class Ratio, class Head, int HeadP, class ...Tail, class Unit, int UnitP>
+        struct InsertF<Units<Ratio, List<lib::units::TDegree<Head, HeadP>, Tail...>>, lib::units::TDegree<Unit, UnitP>>
         {
-            using Result = Multiplying<UnitsA..., UnitsB...>;
-        };
-
-        template<class UnitA, class UnitB>
-        struct TCompare;
-
-        template<class UnitA, class UnitB>
-        constexpr static inline bool Compare = TCompare<UnitA, UnitB>::Result;
-
-        template<class UnitA, int Pa, class UnitB, int Pb>
-        struct TCompare<TDegree<UnitA, Pa>, TDegree<UnitB, Pb>>
-        {
-            constexpr static inline bool Result = lib::type_name<UnitA> < lib::type_name<UnitB>;
-        };
-
-        template<class UnitA, int Pa>
-        struct TCompare<TDegree<UnitA, Pa>, Multiplying<>>
-        {
-            constexpr static inline bool Result = false;
-        };
-
-        template<class UnitB, int Pb>
-        struct TCompare<Multiplying<>, TDegree<UnitB, Pb>>
-        {
-            constexpr static inline bool Result = true;
-        };
-
-        template<class UnitA, class UnitB>
-        struct TMultiplyBinary;
-
-        template<class UnitA, class UnitB>
-        using MultiplyBinary = typename TMultiplyBinary<UnitA, UnitB>::Result;
-
-        template<class UnitA, int Pa, class UnitB, int Pb>
-        struct TMultiplyBinary<TDegree<UnitA, Pa>, TDegree<UnitB, Pb>>
-        {
+            constexpr static inline auto can_convert_head = lib::units::can_convert<Head, Unit>;
+            constexpr static inline auto can_convert_tail = (lib::units::can_convert<Tail, lib::units::TDegree<Unit, UnitP>> || ...);
             using Result = std::conditional_t<
-                Compare<TDegree<UnitA, Pa>, TDegree<UnitB, Pb>>,
-                Multiplying<Degree<UnitA, Pa>, Degree<UnitB, Pb>>,
-                Multiplying<Degree<UnitB, Pb>, Degree<UnitA, Pa>>
-            >;
-        };
-
-        template<class Unit, int Pa, int Pb>
-        struct TMultiplyBinary<TDegree<Unit, Pa>, TDegree<Unit, Pb>>
-        {
-            using Result = Multiplying<Degree<Unit, Pa + Pb>>;
-        };
-
-        template<class UnitA, int Pa>
-        struct TMultiplyBinary<TDegree<UnitA, Pa>, Multiplying<>>
-        {
-            using Result = Multiplying<Degree<UnitA, Pa>>;
-        };
-
-        template<class UnitB, int Pb>
-        struct TMultiplyBinary<Multiplying<>, TDegree<UnitB, Pb>>
-        {
-            using Result = Multiplying<Degree<UnitB, Pb>>;
-        };
-
-        template<class UnitA, class UnitB>
-        struct TMultiply;
-
-        template<class UnitA, class UnitB>
-        using Multiply = typename TMultiply<UnitA, UnitB>::Result;
-
-        template<class UnitA, int Pa, class UnitB, int Pb>
-        struct TMultiply<Multiplying<TDegree<UnitA, Pa>>, Multiplying<TDegree<UnitB, Pb>>>
-        {
-            using Result = MultiplyBinary<TDegree<UnitA, Pa>, TDegree<UnitB, Pb>>;
-        };
-
-        template<class UnitsA, class UnitsB>
-        struct TMultiplyInserts;
-
-        template<class UnitsA, class UnitsB>
-        using MultiplyInserts = typename TMultiplyInserts<UnitsA, UnitsB>::Result;
-
-        template<class Units, class Unit>
-        struct TMultiplyInsert;
-
-        template<class Units, class Unit>
-        using MultiplyInsert = typename TMultiplyInsert<Units, Unit>::Result;
-
-        template<class Head, class ...Tail, class Unit>
-        struct TMultiplyInsert<Multiplying<Head, Tail...>, Multiplying<Unit>>
-        {
-            constexpr static inline bool less = Compare<Unit, Head>;
-            using Result = std::conditional_t<
-                less,
-                Multiplying<Unit, Head, Tail...>,
-                Concat<
-                    Canonical<Head>,
-                    MultiplyInsert<Multiplying<Tail...>, Multiplying<Unit>>
+                can_convert_head,
+                Units<
+                    std::ratio_multiply<
+                        Ratio,
+                        lib::units::ConvertCoefficient<
+                            lib::units::TDegree<Head, HeadP>, lib::units::TDegree<Unit, HeadP>
+                        >
+                    >,
+                    std::conditional_t<
+                        HeadP + UnitP == 0,
+                        List<Tail...>,
+                        List<lib::units::TDegree<Head, HeadP + UnitP>, Tail...>
+                    >
+                >,
+                std::conditional_t<
+                    (lib::type_name<Unit> < lib::type_name<Head>) && (!can_convert_tail),
+                    Units<Ratio, List<lib::units::TDegree<Unit, UnitP>, lib::units::TDegree<Head, HeadP>, Tail...>>,
+                    InsertFront<
+                        typename InsertF<
+                            Units<Ratio, List<Tail...>>,
+                            lib::units::TDegree<Unit, UnitP>
+                        >::Result,
+                        lib::units::TDegree<Head, HeadP>
+                    >
                 >
             >;
-        };
-
-        template<int Ph, class ...Tail, class Unit, int Pu>
-        struct TMultiplyInsert<Multiplying<TDegree<Unit, Ph>, Tail...>, Multiplying<TDegree<Unit, Pu>>>
-        {
-            using Result = std::conditional_t<
-                Pu + Ph == 0,
-                Multiplying<Tail...>,
-                Concat<
-                    MultiplyBinary<TDegree<Unit, Ph>, TDegree<Unit, Pu>>,
-                    Multiplying<Tail...>
-                >
-            >;
-        };
-
-        template<class ...Units>
-        struct TMultiplyInsert<Multiplying<Units...>, Multiplying<>>
-        {
-            using Result = Multiplying<Units...>;
-        };
-
-        template<class Unit>
-        struct TMultiplyInsert<Multiplying<>, Multiplying<Unit>>
-        {
-            using Result = Multiplying<Unit>;
-        };
-
-        template<class Unit>
-        struct TMultiplyInsert<Multiplying<Unit>, Multiplying<>>
-        {
-            using Result = Multiplying<Unit>;
-        };
-
-        template<>
-        struct TMultiplyInsert<Multiplying<>, Multiplying<>>
-        {
-            using Result = Multiplying<>;
-        };
-
-        template<class ...Units, class Unit>
-        struct TMultiply<Multiplying<Unit>, Multiplying<Units...>>
-        {
-            using Result = MultiplyInsert<Multiplying<Units...>, Multiplying<Unit>>;
-        };
-
-        template<class ...UnitsA, class Unit, class ...UnitsB>
-        struct TMultiplyInserts<Multiplying<UnitsA...>, Multiplying<Unit, UnitsB...>>
-        {
-            using Result = MultiplyInserts<MultiplyInsert<Multiplying<UnitsA...>, Multiplying<Unit>>, Multiplying<UnitsB...>>;
-        };
-
-        template<class ...UnitsA>
-        struct TMultiplyInserts<Multiplying<UnitsA...>, Multiplying<>>
-        {
-            using Result = Multiplying<UnitsA...>;
-        };
-
-        template<class ...UnitsA, class ...UnitsB>
-        struct TMultiply<Multiplying<UnitsA...>, Multiplying<UnitsB...>>
-        {
-            using Result = MultiplyInserts<Multiplying<UnitsA...>, Multiplying<UnitsB...>>;
         };
     }
 
     namespace units {
         template<class ...Units>
-        struct TMultiply;
+        struct TMultiply
+        {
+            using Result = details::units::Merge<Canonical<Units>...>;
+        };
 
         template<class ...Units>
-        using Multiply = typename TMultiply<Units...>::Type;
-
-        template<class Unit, class ...Units>
-        struct TMultiply<Unit, Units...>
-        {
-            using Result = details::units::Multiply<
-                Canonical<typename Unit::Dimension>,
-                typename TMultiply<Canonical<typename Units::Dimension>...>::Result
-            >;
-            using Type = Simplify<Result>;
-        };
-
-        template<class UnitA, class UnitB>
-        struct TMultiply<UnitA, UnitB>
-        {
-            using Result = details::units::Multiply<Canonical<typename UnitA::Dimension>, Canonical<typename UnitB::Dimension>>;
-            using Type = Simplify<Result>;
-        };
-
-        template<>
-        struct TMultiply<>
-        {
-            using Result = Multiplying<>;
-            using Type = Result;
-        };
+        using Multiply = Simplify<typename TMultiply<typename Units::Dimension...>::Result>;
 
         template<class UnitA, class UnitB>
         using Divide = Multiply<UnitA, Simplify<Degree<typename UnitB::Dimension, -1>>>;
-
-        template<class UnitA, class UnitB>
-        struct Convert
-        {
-            static_assert(HasCoefficient<Convert<UnitB, UnitA>>);
-            using Coefficient = std::ratio_divide<std::ratio<1>, typename Convert<UnitB, UnitA>::Coefficient>;
-        };
-
-        template<class Unit>
-        struct Convert<Unit, Unit>
-        {
-            using Coefficient = std::ratio<1, 1>;
-        };
-
-        template<class UnitA, class UnitB, int P>
-        struct Convert<TDegree<UnitA, P>, TDegree<UnitB, P>>
-        {
-            using Coefficient = typename Convert<UnitA, UnitB>::Coefficient;
-        };
-
-        template<class UnitA, class ...UnitsA, class UnitB, class ...UnitsB>
-        struct Convert<Multiplying<UnitA, UnitsA...>, Multiplying<UnitB, UnitsB...>>
-        {
-            using Coefficient = std::ratio_multiply<
-                typename Convert<UnitA, UnitB>::Coefficient,
-                typename Convert<Multiplying<UnitsA...>, Multiplying<UnitsB...>>::Coefficient
-            >;
-        };
-
-        template<class UnitA, class UnitB>
-        struct Convert<Multiplying<UnitA>, Multiplying<UnitB>>
-        {
-            using Coefficient = typename Convert<UnitA, UnitB>::Coefficient;
-        };
-
-        template<class Unit>
-        struct Convert<Multiplying<Unit>, Multiplying<Unit>>
-        {
-            using Coefficient = std::ratio<1, 1>;
-        };
     }
 
     template<class Unit, class T, class Ratio = lib::units::GetCoefficient<Unit>>
@@ -433,7 +378,10 @@ namespace lib {
         using Result = Quantity<
             Unit,
             std::common_type_t<T1, T2>,
-            std::ratio<std::gcd(RatioA::num, RatioB::num), std::lcm(RatioA::den, RatioB::den)>
+            std::ratio<
+                gcd(RatioA::num, RatioB::num),
+                lcm(RatioA::den, RatioB::den)
+            >
         >;
     };
 
@@ -493,15 +441,10 @@ namespace lib {
         using OUnit = typename ToQuantity::Unit;
         using OType = typename ToQuantity::Type;
         using ORatio = typename ToQuantity::Ratio;
-        if constexpr (std::is_same_v<IUnit, OUnit>) {
-            return ToQuantity(cast<ORatio, OType, IRatio, IType>(quantity.count()));
-        } else {
-            using Coefficient = typename units::Convert<
-                typename IUnit::Dimension,
-                typename OUnit::Dimension
-            >::Coefficient;
-            return ToQuantity(cast<ORatio, OType, std::ratio_multiply<IRatio, Coefficient>, IType>(quantity.count()));
-        }
+
+        static_assert(units::can_convert<IUnit, OUnit>);
+        using Coefficient = units::ConvertCoefficient<IUnit, OUnit>;
+        return ToQuantity(cast<ORatio, OType, std::ratio_divide<IRatio, Coefficient>, IType>(quantity.count()));
     }
 
     template<class U, class T, class R>
@@ -563,104 +506,180 @@ namespace lib {
     template<class Unit, class A, class ARatio, class B, class BRatio>
     constexpr auto operator+ (const Quantity<Unit, A, ARatio>& a, const Quantity<Unit, B, BRatio>& b) noexcept
     {
-        constexpr auto num = std::gcd(ARatio::num, BRatio::num);
-        constexpr auto den = std::gcd(ARatio::den, BRatio::den);
-        using Ratio = std::ratio<num, (ARatio::den / den) * BRatio::den>;
-
-        using Type = std::common_type_t<A, B>;
-        using CommonQuantity = Quantity<Unit, Type, Ratio>;
-        return CommonQuantity(CommonQuantity(a).count() + CommonQuantity(b).count());
+        using CQuantity = CommonQuantity<Quantity<Unit, A, ARatio>, Quantity<Unit, B, BRatio>>;
+        return CQuantity(CQuantity(a).count() + CQuantity(b).count());
     }
 
     template<class Unit, class A, class ARatio, class B, class BRatio>
     constexpr auto operator- (const Quantity<Unit, A, ARatio>& a, const Quantity<Unit, B, BRatio>& b) noexcept
     {
-        constexpr auto num = std::gcd(ARatio::num, BRatio::num);
-        constexpr auto den = std::gcd(ARatio::den, BRatio::den);
-        using Ratio = std::ratio<num, (ARatio::den / den) * BRatio::den>;
-
-        using Type = std::common_type_t<A, B>;
-        using CommonQuantity = Quantity<Unit, Type, Ratio>;
-        return CommonQuantity(CommonQuantity(a).count() - CommonQuantity(b).count());
+        using CQuantity = CommonQuantity<Quantity<Unit, A, ARatio>, Quantity<Unit, B, BRatio>>;
+        return CQuantity(CQuantity(a).count() - CQuantity(b).count());
     }
 
     template<class AUnit, class A, class ARatio, class BUnit, class B, class BRatio>
     constexpr auto operator* (const Quantity<AUnit, A, ARatio>& a, const Quantity<BUnit, B, BRatio>& b) noexcept
     {
-        using Unit  = typename units::Dimension<units::Multiply<AUnit, BUnit>>::Type;
+        using Unit = typename units::TMultiply<typename AUnit::Dimension, typename BUnit::Dimension>::Result;
         using Type = std::common_type_t<A, B>;
 
-        using Ratio = std::ratio_multiply<ARatio, BRatio>;
-        using CommonQuantity = Quantity<Unit, Type, Ratio>;
-
-        return CommonQuantity(static_cast<Type>(a.count()) * static_cast<Type>(b.count()));
+        using CQuantity = Quantity<
+            typename units::Dimension<units::Simplify<Unit>>::Type,
+            Type,
+            lib::RatioMultiply<ARatio, BRatio, units::GetCoefficient<Unit>>
+        >;
+        return CQuantity(static_cast<Type>(a.count()) * static_cast<Type>(b.count()));
     }
 
     template<class AUnit, class A, class ARatio, class BUnit, class B, class BRatio>
     constexpr auto operator/ (const Quantity<AUnit, A, ARatio>& a, const Quantity<BUnit, B, BRatio>& b) noexcept
     {
-        using Unit = typename units::Dimension<units::Divide<AUnit, BUnit>>::Type;
+        using Unit = typename units::TMultiply<
+            typename AUnit::Dimension,
+            units::Simplify<units::Degree<typename BUnit::Dimension, -1>>
+        >::Result;
         using Type = std::common_type_t<A, B>;
 
-        constexpr auto num = std::gcd(ARatio::num, BRatio::den);
+        constexpr auto num = gcd(ARatio::num, BRatio::den);
         constexpr auto den = ARatio::den * BRatio::num;
 
         using Ratio = std::ratio_divide<std::ratio<num>, std::ratio<den>>;
-        using CommonQuantity = Quantity<Unit, Type, Ratio>;
+        using CQuantity = Quantity<
+            typename units::Dimension<units::Simplify<Unit>>::Type,
+            Type,
+            std::ratio_multiply<units::GetCoefficient<Unit>, Ratio>
+        >;
 
-        return CommonQuantity(
-            (a.count() * std::lcm(ARatio::num, BRatio::den))
+        return CQuantity(
+            (static_cast<Type>(a.count()) * lcm(ARatio::num, BRatio::den))
             /
-            (b.count())
+            (static_cast<Type>(b.count()))
         );
     }
 
     template<class UnitA, class A, class ARatio, class UnitB, class B, class BRatio>
-    constexpr auto operator== (const Quantity<UnitA, A, ARatio>& a, const Quantity<UnitB, B, BRatio>& b) noexcept
+    constexpr auto operator == (const Quantity<UnitA, A, ARatio>& a, const Quantity<UnitB, B, BRatio>& b) noexcept
     {
-        if constexpr (std::is_same_v<UnitA, UnitB>) {
-            using CQ = CommonQuantity<Quantity<UnitA, A, ARatio>, Quantity<UnitB, B, BRatio>>;
-            return CQ(a).count() == CQ(b).count();
+        static_assert(units::can_convert<UnitA, UnitB>);
+        using CoefficientAB = units::ConvertCoefficient<UnitA, UnitB>;
+        using CoefficientBA = units::ConvertCoefficient<UnitB, UnitA>;
+        
+        if constexpr (std::ratio_greater_v<CoefficientAB, CoefficientBA>) {
+            using CQuantity = CommonQuantity<
+                Quantity<UnitA, A, ARatio>,
+                Quantity<UnitA, B, BRatio>
+            >;
+
+            return CQuantity(a).count() == CQuantity(b).count();
         } else {
-            using Coefficient = typename units::Convert<
-                typename UnitB::Dimension,
-                typename UnitA::Dimension
-            >::Coefficient;
-            return a == quantity_cast<Quantity<UnitA, A, std::ratio_multiply<ARatio, Coefficient>>>(b);
+            using CQuantity = CommonQuantity<
+                Quantity<UnitB, A, ARatio>,
+                Quantity<UnitB, B, BRatio>
+            >;
+
+            return CQuantity(a).count() == CQuantity(b).count();
         }
     }
 
-    template<class Unit, class A, class ARatio, class B, class BRatio>
-    constexpr auto operator!= (const Quantity<Unit, A, ARatio>& a, const Quantity<Unit, B, BRatio>& b) noexcept
+    template<class UnitA, class A, class ARatio, class UnitB, class B, class BRatio>
+    constexpr auto operator != (const Quantity<UnitA, A, ARatio>& a, const Quantity<UnitB, B, BRatio>& b) noexcept
     {
         return !(a == b);
     }
 
-    template<class Unit, class A, class ARatio, class B, class BRatio>
-    constexpr auto operator< (const Quantity<Unit, A, ARatio>& a, const Quantity<Unit, B, BRatio>& b) noexcept
+    template<class UnitA, class A, class ARatio, class UnitB, class B, class BRatio>
+    constexpr auto operator < (const Quantity<UnitA, A, ARatio>& a, const Quantity<UnitB, B, BRatio>& b) noexcept
     {
-        using CQ = CommonQuantity<Quantity<Unit, A, ARatio>, Quantity<Unit, B, BRatio>>;
-        return CQ(a).count() < CQ(b).count();
+        static_assert(units::can_convert<UnitA, UnitB>);
+        using CoefficientAB = units::ConvertCoefficient<UnitA, UnitB>;
+        using CoefficientBA = units::ConvertCoefficient<UnitB, UnitA>;
+        
+        if constexpr (std::ratio_greater_v<CoefficientAB, CoefficientBA>) {
+            using CQuantity = CommonQuantity<
+                Quantity<UnitA, A, ARatio>,
+                Quantity<UnitA, B, BRatio>
+            >;
+
+            return CQuantity(a).count() < CQuantity(b).count();
+        } else {
+            using CQuantity = CommonQuantity<
+                Quantity<UnitB, A, ARatio>,
+                Quantity<UnitB, B, BRatio>
+            >;
+
+            return CQuantity(a).count() < CQuantity(b).count();
+        }
     }
 
-    template<class Unit, class A, class ARatio, class B, class BRatio>
-    constexpr auto operator<= (const Quantity<Unit, A, ARatio>& a, const Quantity<Unit, B, BRatio>& b) noexcept
+    template<class UnitA, class A, class ARatio, class UnitB, class B, class BRatio>
+    constexpr auto operator <= (const Quantity<UnitA, A, ARatio>& a, const Quantity<UnitB, B, BRatio>& b) noexcept
     {
-        using CQ = CommonQuantity<Quantity<Unit, A, ARatio>, Quantity<Unit, B, BRatio>>;
-        return CQ(a).count() <= CQ(b).count();
+        static_assert(units::can_convert<UnitA, UnitB>);
+        using CoefficientAB = units::ConvertCoefficient<UnitA, UnitB>;
+        using CoefficientBA = units::ConvertCoefficient<UnitB, UnitA>;
+        
+        if constexpr (std::ratio_greater_v<CoefficientAB, CoefficientBA>) {
+            using CQuantity = CommonQuantity<
+                Quantity<UnitA, A, ARatio>,
+                Quantity<UnitA, B, BRatio>
+            >;
+
+            return CQuantity(a).count() <= CQuantity(b).count();
+        } else {
+            using CQuantity = CommonQuantity<
+                Quantity<UnitB, A, ARatio>,
+                Quantity<UnitB, B, BRatio>
+            >;
+
+            return CQuantity(a).count() <= CQuantity(b).count();
+        }
     }
 
-    template<class Unit, class A, class ARatio, class B, class BRatio>
-    constexpr auto operator> (const Quantity<Unit, A, ARatio>& a, const Quantity<Unit, B, BRatio>& b) noexcept
+    template<class UnitA, class A, class ARatio, class UnitB, class B, class BRatio>
+    constexpr auto operator > (const Quantity<UnitA, A, ARatio>& a, const Quantity<UnitB, B, BRatio>& b) noexcept
     {
-        using CQ = CommonQuantity<Quantity<Unit, A, ARatio>, Quantity<Unit, B, BRatio>>;
-        return CQ(a).count() > CQ(b).count();
+        static_assert(units::can_convert<UnitA, UnitB>);
+        using CoefficientAB = units::ConvertCoefficient<UnitA, UnitB>;
+        using CoefficientBA = units::ConvertCoefficient<UnitB, UnitA>;
+        
+        if constexpr (std::ratio_greater_v<CoefficientAB, CoefficientBA>) {
+            using CQuantity = CommonQuantity<
+                Quantity<UnitA, A, ARatio>,
+                Quantity<UnitA, B, BRatio>
+            >;
+
+            return CQuantity(a).count() > CQuantity(b).count();
+        } else {
+            using CQuantity = CommonQuantity<
+                Quantity<UnitB, A, ARatio>,
+                Quantity<UnitB, B, BRatio>
+            >;
+
+            return CQuantity(a).count() > CQuantity(b).count();
+        }
     }
 
-    template<class Unit, class A, class ARatio, class B, class BRatio>
-    constexpr auto operator>= (const Quantity<Unit, A, ARatio>& a, const Quantity<Unit, B, BRatio>& b) noexcept
+    template<class UnitA, class A, class ARatio, class UnitB, class B, class BRatio>
+    constexpr auto operator >= (const Quantity<UnitA, A, ARatio>& a, const Quantity<UnitB, B, BRatio>& b) noexcept
     {
-        using CQ = CommonQuantity<Quantity<Unit, A, ARatio>, Quantity<Unit, B, BRatio>>;
-        return CQ(a).count() >= CQ(b).count();
+        static_assert(units::can_convert<UnitA, UnitB>);
+        using CoefficientAB = units::ConvertCoefficient<UnitA, UnitB>;
+        using CoefficientBA = units::ConvertCoefficient<UnitB, UnitA>;
+        
+        if constexpr (std::ratio_greater_v<CoefficientAB, CoefficientBA>) {
+            using CQuantity = CommonQuantity<
+                Quantity<UnitA, A, ARatio>,
+                Quantity<UnitA, B, BRatio>
+            >;
+
+            return CQuantity(a).count() >= CQuantity(b).count();
+        } else {
+            using CQuantity = CommonQuantity<
+                Quantity<UnitB, A, ARatio>,
+                Quantity<UnitB, B, BRatio>
+            >;
+
+            return CQuantity(a).count() >= CQuantity(b).count();
+        }
     }
 }
