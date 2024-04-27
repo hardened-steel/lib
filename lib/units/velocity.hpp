@@ -1,19 +1,19 @@
 #pragma once
-#include "lib/units.hpp"
-#include "lib/units/si/length.hpp"
+#include <lib/units.hpp>
+#include <lib/units/si/length.hpp>
 #include <lib/quantity.hpp>
 
 namespace lib::units {
     struct Velocity
     {
-        using Dimension = Devide<Length, Time>;
+        using Dimension = Divide<Metre, Second>;
         constexpr static auto name() noexcept
         {
-            return StaticString("velocity");
+            return string("velocity");
         }
         constexpr static auto symbol() noexcept
         {
-            return StaticString("m/s");
+            return string("m/s");
         }
     };
 
@@ -22,5 +22,4 @@ namespace lib::units {
     {
         using Type = Velocity;
     };
-
 }

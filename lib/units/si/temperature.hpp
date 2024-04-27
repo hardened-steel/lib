@@ -8,11 +8,11 @@ namespace lib::units {
         using Dimension = Temperature;
         constexpr static auto name() noexcept
         {
-            return StaticString("degree Kelvin");
+            return string("degree Kelvin");
         }
         constexpr static auto symbol() noexcept
         {
-            return StaticString("K");
+            return string("K");
         }
     };
     constexpr inline Unit<Temperature> kelvin {};
@@ -28,5 +28,4 @@ namespace lib::units {
     {
         return Quantity<Temperature, long double>(quantity);
     }
-
 }

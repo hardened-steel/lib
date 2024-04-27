@@ -8,11 +8,11 @@ namespace lib::units {
         using Dimension = ECurrent;
         constexpr static auto name() noexcept
         {
-            return StaticString("electric current");
+            return string("electric current");
         }
         constexpr static auto symbol() noexcept
         {
-            return StaticString("A");
+            return string("A");
         }
     };
     constexpr inline Unit<ECurrent> ampere {};

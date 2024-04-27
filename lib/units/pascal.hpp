@@ -5,14 +5,14 @@
 namespace lib::units {
     struct Pascal
     {
-        using Dimension = Devide<Newton, Area>;
+        using Dimension = Divide<Newton, Area<Metre>>;
         constexpr static auto name() noexcept
         {
-            return StaticString("pressure");
+            return string("pressure");
         }
         constexpr static auto symbol() noexcept
         {
-            return StaticString("Pa");
+            return string("Pa");
         }
     };
     constexpr inline Unit<Pascal> pascal {};

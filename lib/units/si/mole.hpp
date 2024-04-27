@@ -8,11 +8,11 @@ namespace lib::units {
         using Dimension = Mole;
         constexpr static auto name() noexcept
         {
-            return StaticString("amount of substance");
+            return string("amount of substance");
         }
         constexpr static auto symbol() noexcept
         {
-            return StaticString("mol");
+            return string("mol");
         }
     };
     constexpr inline Unit<Mole> mole {};

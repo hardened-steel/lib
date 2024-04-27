@@ -3,30 +3,30 @@
 #include <lib/literal.hpp>
 
 namespace lib::units {
-    struct Length
+    struct Metre
     {
-        using Dimension = Length;
+        using Dimension = Metre;
         constexpr static auto name() noexcept
         {
-            return StaticString("length");
+            return string("metre");
         }
         constexpr static auto symbol() noexcept
         {
-            return StaticString("m");
+            return string("m");
         }
     };
-    constexpr inline Unit<Length> metre {};
+    constexpr inline Unit<Metre> metre {};
 
     template<char ...Chars>
     constexpr auto operator ""_m() noexcept
     {
         using Parser = literal::Parser<Chars...>;
-        return Quantity<Length, typename Parser::Type>(Parser::value);
+        return Quantity<Metre, typename Parser::Type>(Parser::value);
     }
 
     inline constexpr auto operator ""_m(long double quantity) noexcept
     {
-        return Quantity<Length, long double>(quantity);
+        return Quantity<Metre, long double>(quantity);
     }
 
 }
