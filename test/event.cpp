@@ -4,38 +4,41 @@
 
 TEST(lib, event)
 {
-    lib::Event a, b, c, d;
+    lib::Event event_a;
+    lib::Event event_b;
+    lib::Event event_c;
+    lib::Event event_d;
     {
-        ASSERT_FALSE(a.poll());
-        lib::EventMux mux {a, b, c, d};
+        ASSERT_FALSE(event_a.poll());
+        lib::EventMux mux {event_a, event_b, event_c, event_d};
         lib::Handler handler;
         mux.subscribe(&handler);
 
-        auto result = std::async([&] { a.emit(); });
+        auto result = std::async([&] { event_a.emit(); });
         handler.wait();
         result.get();
         mux.subscribe(nullptr);
     }
     {
-        ASSERT_FALSE(a.poll());
-        lib::EventMux mux {a, b, c, d};
+        ASSERT_FALSE(event_a.poll());
+        lib::EventMux mux {event_a, event_b, event_c, event_d};
         lib::Handler handler;
         mux.subscribe(&handler);
 
-        auto result = std::async([&] { a.emit(); });
+        auto result = std::async([&] { event_a.emit(); });
         handler.wait();
         result.get();
     }
     {
-        lib::EventMux mux {a, b, c, d};
+        lib::EventMux mux {event_a, event_b, event_c, event_d};
         lib::Handler handler;
         mux.subscribe(&handler);
 
-        auto result = std::async([&] { c.emit(); b.emit(); });
+        auto result = std::async([&] { event_c.emit(); event_b.emit(); });
         handler.wait();
-        ASSERT_TRUE(c.poll() || b.poll());
+        ASSERT_TRUE(event_c.poll() || event_b.poll());
         handler.wait();
-        ASSERT_TRUE(c.poll() && b.poll());
+        ASSERT_TRUE(event_c.poll() && event_b.poll());
         result.get();
     }
 }

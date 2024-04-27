@@ -81,9 +81,9 @@ namespace lib {
         using HasCoefficientT = typename T::Coefficient;
 
         template<class T>
-        constexpr inline bool HasCoefficient = lib::detect<T, HasCoefficientT>;
+        constexpr inline bool has_coefficient = lib::detect<T, HasCoefficientT>;
 
-        template<class T, bool = HasCoefficient<T>>
+        template<class T, bool = has_coefficient<T>>
         struct GetCoefficientT
         {
             using Result = std::ratio<1>;
@@ -182,24 +182,24 @@ namespace lib {
         struct TCompare;
 
         template<class UnitA, class UnitB>
-        constexpr static inline bool Compare = TCompare<UnitA, UnitB>::Result;
+        constexpr static inline bool compare = TCompare<UnitA, UnitB>::result;
 
         template<class UnitA, int Pa, class UnitB, int Pb>
         struct TCompare<TDegree<UnitA, Pa>, TDegree<UnitB, Pb>>
         {
-            constexpr static inline bool Result = lib::type_name<UnitA> < lib::type_name<UnitB>;
+            constexpr static inline bool result = lib::type_name<UnitA> < lib::type_name<UnitB>;
         };
 
         template<class UnitA, int Pa>
         struct TCompare<TDegree<UnitA, Pa>, Multiplying<>>
         {
-            constexpr static inline bool Result = false;
+            constexpr static inline bool result = false;
         };
 
         template<class UnitB, int Pb>
         struct TCompare<Multiplying<>, TDegree<UnitB, Pb>>
         {
-            constexpr static inline bool Result = true;
+            constexpr static inline bool result = true;
         };
 
         template<class UnitA, class UnitB>
@@ -212,7 +212,7 @@ namespace lib {
         struct TMultiplyBinary<TDegree<UnitA, Pa>, TDegree<UnitB, Pb>>
         {
             using Result = std::conditional_t<
-                Compare<TDegree<UnitA, Pa>, TDegree<UnitB, Pb>>,
+                compare<TDegree<UnitA, Pa>, TDegree<UnitB, Pb>>,
                 Multiplying<Degree<UnitA, Pa>, Degree<UnitB, Pb>>,
                 Multiplying<Degree<UnitB, Pb>, Degree<UnitA, Pa>>
             >;
@@ -263,7 +263,7 @@ namespace lib {
         template<class Head, class ...Tail, class Unit>
         struct TMultiplyInsert<Multiplying<Head, Tail...>, Multiplying<Unit>>
         {
-            constexpr static inline bool less = Compare<Unit, Head>;
+            constexpr static inline bool less = compare<Unit, Head>;
             using Result = std::conditional_t<
                 less,
                 Multiplying<Unit, Head, Tail...>,
@@ -525,7 +525,7 @@ namespace lib {
     }
 
     template<class Unit, class A, class ARatio, class B, class BRatio>
-    constexpr auto operator- (const Quantity<Unit, A, ARatio>& a, const Quantity<Unit, B, BRatio>& b) noexcept
+    constexpr auto operator- (const Quantity<Unit, A, ARatio>& lhs, const Quantity<Unit, B, BRatio>& rhs) noexcept
     {
         constexpr auto num = std::gcd(ARatio::num, BRatio::num);
         constexpr auto den = std::gcd(ARatio::den, BRatio::den);
@@ -533,11 +533,11 @@ namespace lib {
 
         using Type = std::common_type_t<A, B>;
         using CommonQuantity = Quantity<Unit, Type, Ratio>;
-        return CommonQuantity(CommonQuantity(a).count() - CommonQuantity(b).count());
+        return CommonQuantity(CommonQuantity(lhs).count() - CommonQuantity(rhs).count());
     }
 
     template<class AUnit, class A, class ARatio, class BUnit, class B, class BRatio>
-    constexpr auto operator* (const Quantity<AUnit, A, ARatio>& a, const Quantity<BUnit, B, BRatio>& b) noexcept
+    constexpr auto operator* (const Quantity<AUnit, A, ARatio>& lhs, const Quantity<BUnit, B, BRatio>& rhs) noexcept
     {
         using Unit  = typename units::Dimension<units::Multiply<AUnit, BUnit>>::Type;
         using Type = std::common_type_t<A, B>;
@@ -545,7 +545,7 @@ namespace lib {
         using Ratio = std::ratio_multiply<ARatio, BRatio>;
         using CommonQuantity = Quantity<Unit, Type, Ratio>;
 
-        return CommonQuantity(static_cast<Type>(a.count()) * static_cast<Type>(b.count()));
+        return CommonQuantity(static_cast<Type>(lhs.count()) * static_cast<Type>(rhs.count()));
     }
 
     template<class AUnit, class A, class ARatio, class BUnit, class B, class BRatio>

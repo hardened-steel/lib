@@ -13,7 +13,7 @@ namespace lib {
     {
     public:
         virtual void notify() noexcept = 0;
-        virtual ~IHandler() noexcept {};
+        virtual ~IHandler() noexcept = default;
         virtual void wait(std::size_t count = 1) noexcept = 0;
     };
 
@@ -32,13 +32,12 @@ namespace lib {
     {
         Event*      event;
         IHandler* handler;
-        std::size_t count;
+        std::size_t count = 0;
     public:
         template<class Handler>
         Subscriber(Event& event, Handler& handler) noexcept
         : event(&event)
         , handler(&handler)
-        , count(0)
         {
             event.subscribe(&handler);
         }
@@ -120,7 +119,7 @@ namespace lib {
         IEvent& operator=(const IEvent&) = default;
         IEvent& operator=(IEvent&&) = default;
     public:
-        bool poll() const noexcept
+        [[nodiscard]] bool poll() const noexcept
         {
             return interface->poll(event);
         }
@@ -138,9 +137,9 @@ namespace lib {
     {
     public:
         void emit() const noexcept {}
-        bool poll() const noexcept { return false; }
-        std::size_t subscribe(IHandler* handler) const noexcept { return 0; }
-        std::size_t reset() const noexcept { return 0; }
+        bool poll() const noexcept { return false; }                              // NOLINT
+        std::size_t subscribe(IHandler* /*handler*/) const noexcept { return 0; } // NOLINT
+        std::size_t reset() const noexcept { return 0; }                          // NOLINT
     };
 
     template<class ...Events>
@@ -160,7 +159,7 @@ namespace lib {
         {
             return reset(std::make_index_sequence<sizeof...(Events)>{});
         }
-        bool poll() const noexcept
+        [[nodiscard]] bool poll() const noexcept
         {
             return poll(std::make_index_sequence<sizeof...(Events)>{});
         }
@@ -212,7 +211,7 @@ namespace lib {
             }
             return count;
         }
-        bool poll() const noexcept
+        [[nodiscard]] bool poll() const noexcept
         {
             for (auto& event: events) {
                 if (event.poll()) {

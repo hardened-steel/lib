@@ -1,6 +1,5 @@
 #pragma once
 #include <variant>
-#include <optional>
 #include <bitset>
 #include <stdexcept>
 #include <lib/event.hpp>
@@ -520,5 +519,5 @@ namespace lib {
     };
 
     template<class T>
-    const inline BlackHole<T> blackHole {};
+    const inline BlackHole<T> black_hole {};
 }

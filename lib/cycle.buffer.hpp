@@ -25,7 +25,7 @@ namespace lib {
         using pointer           = T*;
         using reference         = T&;
     public:
-        constexpr CycleBufferIterator(T* buffer, std::size_t position, std::size_t size) noexcept
+        constexpr CycleBufferIterator(T* buffer, std::size_t position, std::size_t size) noexcept // NOLINT
         : buffer(buffer), position(position), size(size)
         {}
         CycleBufferIterator(const CycleBufferIterator&) = default;
@@ -235,7 +235,7 @@ namespace lib {
             }
             return *this;
         }
-        CycleBuffer& operator=(CycleBuffer&& other)
+        CycleBuffer& operator=(CycleBuffer&& other) noexcept
         {
             if(this != &other) {
                 clear();

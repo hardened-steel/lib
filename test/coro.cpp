@@ -1,10 +1,10 @@
 #include <gtest/gtest.h>
+#include <future>
 #include <lib/buffered.channel.hpp>
 #include <lib/aggregate.channel.hpp>
 #include <lib/broadcast.channel.hpp>
 #include <lib/typename.hpp>
 #include <lib/coro.hpp>
-#include <future>
 
 template<class Channel>
 struct IChannelAwaiter
@@ -12,7 +12,7 @@ struct IChannelAwaiter
     using Type = typename Channel::Type;
     Channel* channel;
 
-    bool await_ready() const noexcept
+    [[nodiscard]] bool await_ready() const noexcept
     {
         return channel->rpoll();
     }
@@ -36,7 +36,7 @@ template<class T>
 class ChannelGenerator: public lib::IChannel<ChannelGenerator<T>>
 {
 public:
-    class promise_type;
+    class promise_type; // NOLINT
     using Handle = std::coroutine_handle<promise_type>;
 
     class promise_type
@@ -176,11 +176,11 @@ TEST(lib, coro_channel)
     scheduler += read_all(channel);
 
     auto worker = std::async(
-        [](lib::VOChannel<int> ochannel) {
-            ochannel.send(4);
-            ochannel.send(5);
-            ochannel.send(6);
-            ochannel.close();
+        [](lib::VOChannel<int> out_channel) {
+            out_channel.send(4);
+            out_channel.send(5);
+            out_channel.send(6);
+            out_channel.close();
         },
         lib::VOChannel<int>(channel)
     );
