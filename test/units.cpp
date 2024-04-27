@@ -1,10 +1,14 @@
 #include <iterator>
 #include <lib/static.string.hpp>
 #include <lib/units.hpp>
+
 #include <lib/units/electrical.resistance.hpp>
 #include <lib/units/voltage.hpp>
 #include <lib/units/pascal.hpp>
 #include <lib/units/si/time.hpp>
+#include <lib/units/velocity.hpp>
+#include <lib/units/area.hpp>
+
 #include <lib/units.io.hpp>
 #include <gtest/gtest.h>
 #include <lib/quantity.hpp>
@@ -30,13 +34,13 @@ namespace lib::units {
     struct Turn
     {
         using Dimension = Turn;
-        constexpr static std::string_view name() noexcept
+        constexpr static auto name() noexcept
         {
-            return "turns";
+            return string("turns");
         }
-        constexpr static std::string_view symbol() noexcept
+        constexpr static auto symbol() noexcept
         {
-            return "turn";
+            return string("turn");
         }
     };
     constexpr inline Unit<units::Turn> turn {};
@@ -55,15 +59,14 @@ namespace lib::units {
 
     struct Rpm
     {
-        using Dimension = Devide<Turn, Time>;
-        using Coefficient = std::ratio<1, 60>;
-        constexpr static std::string_view name() noexcept
+        using Dimension = Divide<Turn, Minute>;
+        constexpr static auto name() noexcept
         {
-            return "revolutions per minute";
+            return string("revolutions per minute");
         }
-        constexpr static std::string_view symbol() noexcept
+        constexpr static auto symbol() noexcept
         {
-            return "rpm";
+            return string("rpm");
         }
     };
     template<>
@@ -84,6 +87,56 @@ namespace lib::units {
     {
         return Quantity<Rpm, long double>(quantity);
     }
+
+    struct Mile
+    {
+        using Dimension = Mile;
+        constexpr static auto name() noexcept
+        {
+            return string("Mile");
+        }
+        constexpr static auto symbol() noexcept
+        {
+            return string("mile");
+        }
+    };
+
+    struct VelocityMPH
+    {
+        using Dimension = Divide<Mile, Hour>;
+        constexpr static auto name() noexcept
+        {
+            return string("velocity");
+        }
+        constexpr static auto symbol() noexcept
+        {
+            return string("mph");
+        }
+    };
+
+    template<>
+    struct Dimension<Multiplying<TDegree<Hour, -1>, Mile>>
+    {
+        using Type = VelocityMPH;
+    };
+
+    template<>
+    struct Convert<Mile, Metre>
+    {
+        using Coefficient = std::ratio<1609344, 1000>;
+    };
+
+    template<char ...Chars>
+    constexpr auto operator "" _mile() noexcept
+    {
+        using Parser = literal::Parser<Chars...>;
+        return Quantity<Mile, typename Parser::Type>(Parser::value);
+    }
+
+    inline constexpr auto operator "" _mile(long double quantity) noexcept
+    {
+        return Quantity<Mile, long double>(quantity);
+    }
 }
 
 TEST(lib, units)
@@ -102,7 +155,7 @@ TEST(lib, units)
     {
         const auto R = 100_ohm;
         // kg⋅m2⋅s−3⋅A−2
-        const auto R2 = (1_kg * 1_m) * (1_m / lib::Quantity<Time, int>(1)) * (1 / (lib::Quantity<Time, int>(1) * (lib::Quantity<Time, int>(1) * 1_A) * 1_A));
+        const auto R2 = (1_kg * 1_m) * (1_m / lib::Quantity<Second, int>(1)) * (1 / (lib::Quantity<Second, int>(1) * (lib::Quantity<Second, int>(1) * 1_A) * 1_A));
         EXPECT_EQ(R2 * 100, R);
         const auto A = 2_m * 3_m;
         const auto P = 12_N / A;
@@ -148,7 +201,14 @@ TEST(lib, units)
     }
     {
         auto fanspeed = 100_turn / 2_min;
+        std::cout << "fanspeed: " << lib::type_name<decltype(fanspeed)> << " = " << fanspeed.count() << std::endl;
         auto turns = fanspeed * 6_s;
         EXPECT_EQ(turns, 5_turn);
+    }
+    {
+        lib::Quantity speed1 = 100.0_mile / 1_h;
+        lib::Quantity<lib::units::Velocity, float> speed2 = speed1;
+        std::cout << lib::type_name<decltype(speed1)> << ": " << speed1 << std::endl;
+        std::cout << lib::type_name<decltype(speed2)> << ": " << speed2 << std::endl;
     }
 }

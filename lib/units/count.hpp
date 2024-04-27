@@ -10,11 +10,11 @@ namespace lib {
             using Dimension = Multiplying<>;
             constexpr static auto name() noexcept
             {
-                return StaticString("counts");
+                return string("counts");
             }
             constexpr static auto symbol() noexcept
             {
-                return StaticString("");
+                return string("");
             }
         };
 

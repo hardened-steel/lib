@@ -12,7 +12,7 @@ namespace lib {
     {
         constexpr auto symbol = Unit::symbol();
         if constexpr(sizeof(T) == 1) {
-            return stream << (static_cast<unsigned>(quantity.count()) * Ratio::num) / Ratio::den << " " << std::string_view(symbol.data(), symbol.size());
+            return stream << (static_cast<int>(quantity.count()) * Ratio::num) / Ratio::den << " " << std::string_view(symbol.data(), symbol.size());
         } else {
             return stream << (quantity.count() * Ratio::num) / Ratio::den << " " << std::string_view(symbol.data(), symbol.size());
         }
@@ -24,10 +24,10 @@ namespace lib {
         {
             constexpr auto symbol = Unit::symbol();
             if constexpr(std::is_same_v<Unit, lib::units::Count>) {
-                return stream << (static_cast<unsigned>(quantity.count()) * Ratio::num) / Ratio::den << " " << std::string_view(symbol.data(), symbol.size());
+                return stream << (static_cast<unsigned>(quantity.count()) * Ratio::num) / Ratio::den;
             }
             if constexpr(sizeof(T) == 1) {
-                return stream << static_cast<unsigned>(quantity.count()) << " " << prefix << std::string_view(symbol.data(), symbol.size());
+                return stream << static_cast<int>(quantity.count()) << " " << prefix << std::string_view(symbol.data(), symbol.size());
             } else {
                 return stream << quantity.count() << " " << prefix << std::string_view(symbol.data(), symbol.size());
             }

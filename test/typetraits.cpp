@@ -67,6 +67,10 @@ TEST(typetraits, Set)
     static_assert(!exists<S, unsigned>);
     static_assert(std::is_same_v<Erase<S, float>, Set<int, void>>);
     static_assert(std::is_same_v<Erase<S, unsigned>, S>);
+
+    static_assert(std::is_same_v<S, Merge<EmptySet, S>>);
+    static_assert(std::is_same_v<S, Merge<EmptySet, EmptySet, Insert<Insert<S, float>, int>, Set<void>>>);
+    static_assert(std::is_same_v<S, Merge<EmptySet, Insert<Set<float>, int>, EmptySet, Set<void>>>);
 }
 
 TEST(typetraits, Map)
@@ -87,7 +91,7 @@ TEST(typetraits, Map)
 using namespace lib::typetraits;
 
 template<class Param>
-struct Factorial
+struct Factorial: interpreter::Function
 {
     struct Result;
     struct Counter;
@@ -105,7 +109,7 @@ struct Factorial
     >;
 };
 
-struct ErrorFunction
+struct ErrorFunction: interpreter::Function
 {
     struct Variable;
     using Body = Scope<
@@ -115,7 +119,7 @@ struct ErrorFunction
 };
 
 template<class A, class B>
-struct FooFunction
+struct FooFunction: interpreter::Function
 {
     using Body = Scope<
         Return<Add<A, B>>
@@ -123,7 +127,7 @@ struct FooFunction
 };
 
 template<class IValue>
-struct BarFunction
+struct BarFunction: interpreter::Function
 {
     struct Result;
     using Body = Scope<
@@ -134,12 +138,12 @@ struct BarFunction
 
 TEST(typetraits, Interpreter)
 {
-    using namespace lib::typetraits;
+    using namespace lib::typetraits::interpreter;
     static_assert(Call<Factorial<Value<5>>>::value == 120);
     static_assert(Call<Factorial<Value<4>>>::value == 24);
     static_assert(Call<Factorial<Value<0>>>::value == 1);
-    EXPECT_STREQ(Call<ErrorFunction>::message, "write to undefined variable 'ErrorFunction::Variable'");
+    EXPECT_EQ(Call<ErrorFunction>::message, "write to undefined variable 'ErrorFunction::Variable'");
     static_assert(Call<BarFunction<Value<10>>>::value == 52);
-    static_assert(impl::IsFunction<BarFunction<Value<10>>>);
+    static_assert(lib::typetraits::interpreter::impl::IsFunction<BarFunction<Value<10>>>);
 }
 

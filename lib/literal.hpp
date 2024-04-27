@@ -17,9 +17,7 @@ namespace lib::literal {
         template<MaxType Value>
         auto select() noexcept
         {
-            if constexpr(Value <= std::numeric_limits<std::uint8_t>::max()) {
-                return BaseType<std::uint8_t>{};
-            } else if constexpr(Value <= std::numeric_limits<std::uint16_t>::max()) {
+            if constexpr(Value <= std::numeric_limits<std::uint16_t>::max()) {
                 return BaseType<std::uint16_t>{};
             } else if constexpr(Value <= std::numeric_limits<std::uint32_t>::max()) {
                 return BaseType<std::uint32_t>{};

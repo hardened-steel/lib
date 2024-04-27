@@ -23,7 +23,7 @@ namespace lib::interpreter {
         template<class ...Operators>
         using GetVariables = lib::typetraits::Erase<
             lib::typetraits::Apply<
-                lib::typetraits::CreatetSet<Operators...>,
+                lib::typetraits::CreateSet<Operators...>,
                 FilterVariableDeclaration
             >,
             void

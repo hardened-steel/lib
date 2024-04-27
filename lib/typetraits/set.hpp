@@ -81,6 +81,47 @@ namespace lib::typetraits {
     using Insert = impl::Insert<Set, T>;
 
     namespace impl {
+        template<class Lhs, class Rhs>
+        struct MergeBinaryF;
+
+        template<class Lhs, class Rhs>
+        using MergeBinary = typename MergeBinaryF<Lhs, Rhs>::Result;
+
+        template<class Lhs, class Head, class ...Tail>
+        struct MergeBinaryF<Lhs, Set<Head, Tail...>>
+        {
+            using Result = MergeBinary<Insert<Lhs, Head>, Set<Tail...>>;
+        };
+
+        template<class ...Types>
+        struct MergeBinaryF<Set<Types...>, Set<>>
+        {
+            using Result = Set<Types...>;
+        };
+
+        template<class ...Sets>
+        struct MergeF;
+
+        template<class ...Sets>
+        using Merge = typename MergeF<Sets...>::Result;
+
+        template<class Lhs, class Head, class ...Tail>
+        struct MergeF<Lhs, Head, Tail...>
+        {
+            using Result = typename MergeF<MergeBinary<Lhs, Head>, Tail...>::Result;
+        };
+
+        template<class Lhs, class Rhs>
+        struct MergeF<Lhs, Rhs>
+        {
+            using Result = MergeBinary<Lhs, Rhs>;
+        };
+    }
+    
+    template<class ...Sets>
+    using Merge = impl::Merge<Sets...>;
+
+    namespace impl {
         template<class ...TList>
         struct CreateSetF
         {
@@ -102,7 +143,7 @@ namespace lib::typetraits {
     }
 
     template<class ...TList>
-    using CreatetSet = typename impl::CreateSetF<TList...>::Result;
+    using CreateSet = typename impl::CreateSetF<TList...>::Result;
 
     namespace impl {
         template<class ...Ts, std::size_t Index>
@@ -213,7 +254,7 @@ namespace lib::typetraits {
         template<template <typename> class F, class ...Ts>
         struct ApplyF<Set<Ts...>, F>
         {
-            using Result = Set<F<Ts>...>;
+            using Result = CreateSet<F<Ts>...>;
         };
     }
 

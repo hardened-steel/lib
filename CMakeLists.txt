@@ -3,6 +3,8 @@ project(lib LANGUAGES CXX C VERSION 0.0.1)
 
 LIST(APPEND CMAKE_MODULE_PATH ${CMAKE_SOURCE_DIR}/cmake)
 
+add_compile_options("-ftemplate-backtrace-limit=0")
+
 include(FetchContent)
 include(platform)
 enable_testing()

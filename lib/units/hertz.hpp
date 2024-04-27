@@ -7,11 +7,11 @@ namespace lib::units {
         using Dimension = Degree<Time, -1>;
         constexpr static auto name() noexcept
         {
-            return StaticString("frequency");
+            return string("frequency");
         }
         constexpr static auto symbol() noexcept
         {
-            return StaticString("Hz");
+            return string("Hz");
         }
     };
     constexpr inline Unit<Hertz> hertz {};

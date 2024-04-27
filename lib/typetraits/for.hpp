@@ -2,7 +2,7 @@
 #include <type_traits>
 #include <lib/typetraits/if.hpp>
 
-namespace lib::typetraits {
+namespace lib::typetraits::interpreter {
 
     namespace impl {
         template<class List, class IContext, template <class Context, class Element> class Action>
@@ -32,5 +32,4 @@ namespace lib::typetraits {
             using Result = IContext;
         };
     }
-
 }
