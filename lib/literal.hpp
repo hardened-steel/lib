@@ -1,7 +1,7 @@
 #pragma once
 #include <limits>
-#include <type_traits>
 #include <cstdint>
+#include <lib/array.hpp>
 
 namespace lib::literal {
 
@@ -61,7 +61,7 @@ namespace lib::literal {
             constexpr static MaxType value() noexcept
             {
                 MaxType result = 0;
-                constexpr std::uint8_t digits[] = {Digit<Base, Chars>::value ...}; 
+                constexpr std::array digits {Digit<Base, Chars>::value...};
                 for(auto digit: digits) {
                     result *= Base;
                     result += digit;

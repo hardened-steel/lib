@@ -1,4 +1,5 @@
 #pragma once
+#include <lib/raw.array.hpp>
 #include <lib/static.string.hpp>
 
 namespace lib {
@@ -194,7 +195,7 @@ namespace lib {
     }
 
     template<std::size_t N>
-    constexpr auto convert_string(const char (&string)[N]) noexcept
+    constexpr auto convert_string(RawArray<const char, N> string) noexcept
     {
         return std::string_view(string);
     }

@@ -1,5 +1,4 @@
 #pragma once
-#include <utility>
 #include <lib/static.string.hpp>
 
 namespace lib {
@@ -65,11 +64,11 @@ namespace lib {
         constexpr auto get_value_string_impl() noexcept
         {
             constexpr std::string_view pretty = lib::type_name<ValueTag<V>>;
-            const auto prefix = std::string_view{"ValueTag<"};
-            const auto suffix = ">";
+            const std::string_view prefix = "ValueTag<";
+            const std::string_view suffix = ">";
             
             const auto start = pretty.find(prefix) + prefix.size();
-            const auto end = pretty.find(suffix);
+            const auto end = pretty.rfind(suffix);
             const auto size = end - start;
 
             return pretty.substr(start, size);
@@ -99,6 +98,12 @@ namespace lib {
         constexpr static inline auto name = "std::string_view";
     };
 
+    template<std::size_t N>
+    struct TypeName<StaticString<N>>
+    {
+        constexpr static inline auto name = "lib::static.string[" + value_string<N> + "]";
+    };
+
     template<class T, std::size_t N>
     struct TypeName<std::array<T, N>>
     {
@@ -106,14 +111,8 @@ namespace lib {
     };
 
     template<class T>
-    struct TypeName<span<T>>
+    struct TypeName<Span<T>>
     {
-        constexpr static inline auto name = "lib::span<" + type_name<T> + ">";
-    };
-
-    template<std::size_t N>
-    struct TypeName<StaticString<N>>
-    {
-        constexpr static inline auto name = "lib::static.string[" + value_string<N> + "]";
+        constexpr static inline auto name = "lib::Span<" + type_name<T> + ">";
     };
 }

@@ -5,6 +5,7 @@
 #include <lib/broadcast.channel.hpp>
 #include <lib/typename.hpp>
 #include <lib/coro.hpp>
+#include <lib/data-structures/dl-list.hpp>
 
 template<class Channel>
 struct IChannelAwaiter

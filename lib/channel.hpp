@@ -5,6 +5,7 @@
 #include <lib/event.hpp>
 #include <lib/buffer.hpp>
 #include <lib/overload.hpp>
+#include <lib/raw.storage.hpp>
 
 namespace lib {
 
@@ -295,8 +296,8 @@ namespace lib {
         Channel& channel;
         Handler  handler;
         Subscriber<typename Channel::REvent> subscriber;
-        
-        std::aligned_storage_t<sizeof(Value), alignof(Value)> value;
+
+        RawStorage<Value> storage;
     public:
         class Iterator
         {
@@ -313,8 +314,7 @@ namespace lib {
                 if (!Channel::rwait(range->subscriber, range->channel)) {
                     range = nullptr;
                 } else {
-                    auto ptr = reinterpret_cast<value_type*>(&range->value);
-                    new(ptr) value_type(range->channel.urecv());
+                    range->storage.emplace(range->channel.urecv());
                 }
             }
         public:
@@ -328,19 +328,16 @@ namespace lib {
             ~Iterator() noexcept
             {
                 if(range) {
-                    auto ptr = reinterpret_cast<value_type*>(&range->value);
-                    std::destroy_at(ptr);
+                    range->storage.destroy();
                 }
             }
             auto& operator*() const noexcept
             {
-                auto ptr = reinterpret_cast<value_type*>(&range->value);
-                return *ptr;
+                return *(range->storage.ptr());
             }
             Iterator& operator++()
             {
-                auto ptr = reinterpret_cast<value_type*>(&range->value);
-                std::destroy_at(ptr);
+                range->storage.destroy();
 
                 next();
                 return *this;

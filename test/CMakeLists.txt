@@ -6,7 +6,7 @@ add_executable(${PROJECT_NAME}-test
     channel.cpp
     event.cpp
     cycle.buffer.cpp
-    #coro.cpp
+    coro.cpp
 )
 set_target_properties(${PROJECT_NAME}-test
     PROPERTIES

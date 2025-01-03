@@ -1,4 +1,5 @@
 #pragma once
+#include <lib/channel.hpp>
 #include <lib/units.hpp>
 #include <lib/units/si/time.hpp>
 #include <coroutine>
@@ -13,9 +14,9 @@ namespace lib {
     class EventAwaiter
     {
     public:
-        virtual bool ready() const noexcept = 0;
-        virtual std::coroutine_handle<> coro() const noexcept = 0;
-        virtual lib::IEvent& event() const noexcept = 0;
+        [[nodiscard]] virtual bool ready() const noexcept = 0;
+        [[nodiscard]] virtual std::coroutine_handle<> coro() const noexcept = 0;
+        [[nodiscard]] virtual lib::IEvent& event() const noexcept = 0;
     };
 
     template<>
@@ -30,7 +31,7 @@ namespace lib {
         std::size_t subscribe(IHandler* handler) noexcept
         {
             std::size_t count = 0;
-            for (auto& awaiter: awaiters) {
+            for (const auto& awaiter: awaiters) {
                 count += awaiter->event().subscribe(handler);
             }
             return count;
@@ -38,14 +39,14 @@ namespace lib {
         std::size_t reset() noexcept
         {
             std::size_t count = 0;
-            for (auto& awaiter: awaiters) {
+            for (const auto& awaiter: awaiters) {
                 count += awaiter->event().reset();
             }
             return count;
         }
-        const EventAwaiter* poll() const noexcept
+        [[nodiscard]] const EventAwaiter* poll() const noexcept
         {
-            for (auto& awaiter: awaiters) {
+            for (const auto& awaiter: awaiters) {
                 if (awaiter->event().poll()) {
                     return awaiter;
                 }
@@ -56,23 +57,24 @@ namespace lib {
 
     class BasePromise
     {
-        friend Task;
+        template<class T>
+        friend class Task;
         friend Scheduler;
 
         Scheduler* scheduler = nullptr;
         std::coroutine_handle<> prev = nullptr;
     public:
-        auto initial_suspend() const noexcept
+        auto initial_suspend() const noexcept // NOLINT
         {
             return std::suspend_always{};
         }
 
-        class Awaiter: public std::suspend_always
+        class FinalAwaiter: public std::suspend_always
         {
         public:
-            std::coroutine_handle<> await_suspend(std::coroutine_handle<>) const noexcept;
+            [[nodiscard]] std::coroutine_handle<> await_suspend(std::coroutine_handle<>) const noexcept;
         public:
-            Awaiter(Scheduler* scheduler, std::coroutine_handle<> prev) noexcept
+            constexpr explicit FinalAwaiter(Scheduler* scheduler, std::coroutine_handle<> prev) noexcept
             : scheduler(scheduler), prev(prev)
             {}
         private:
@@ -80,9 +82,9 @@ namespace lib {
             std::coroutine_handle<> prev;
         };
 
-        auto final_suspend() const noexcept
+        [[nodiscard]] auto final_suspend() const noexcept
         {
-            return Awaiter(scheduler, prev);
+            return FinalAwaiter(scheduler, prev);
         }
 
         template<class Channel>
@@ -260,6 +262,19 @@ namespace lib {
         std::list<EventAwaiter*> block_list;
         std::list<std::coroutine_handle<>> gc_tasks;
 
+        auto operator co_await()
+        {
+            class Awaiter: public std::suspend_always
+            {
+            public:
+                constexpr bool await_resume() const noexcept // NOLINT
+                {
+                    return true;
+                }
+            };
+            return Awaiter{};
+        }
+
         static Task<void> garbage_collector(Scheduler& scheduler)
         {
             auto& tasks = scheduler.gc_tasks;
@@ -276,19 +291,6 @@ namespace lib {
         }
 
         const Task<void> gc = garbage_collector(*this);
-
-        auto operator co_await()
-        {
-            class Awaiter: public std::suspend_always
-            {
-            public:
-                bool await_resume() const noexcept
-                {
-                    return true;
-                }
-            };
-            return Awaiter{};
-        }
     public:
         template<class T>
         void bind(Task<T> task)
@@ -296,7 +298,7 @@ namespace lib {
             auto coro = task.release();
             coro.promise().scheduler = this;
             coro.promise().prev = gc.coro;
-            ready_tasks.push_back(coro);
+            ready(coro);
             gc_tasks.push_back(coro);
         }
 
@@ -356,7 +358,7 @@ namespace lib {
                 if (!block_list.empty()) {
                     Subscriber subscriber(blocks, handler);
                     subscriber.reset();
-                    while (!check_blocks()) {
+                    while (!check_blocks() && ready_tasks.empty()) {
                         subscriber.wait();
                         subscriber.reset();
                     }
@@ -365,7 +367,7 @@ namespace lib {
         }
     };
 
-    std::coroutine_handle<> BasePromise::Awaiter::await_suspend(std::coroutine_handle<>) const noexcept
+    inline std::coroutine_handle<> BasePromise::FinalAwaiter::await_suspend(std::coroutine_handle<>) const noexcept
     {
         if (prev) {
             scheduler->ready(prev);
@@ -382,7 +384,7 @@ namespace lib {
     }
 
     template<class T, class Ratio>
-    auto operator co_await(const Quantity<units::Time, T, Ratio>& duration) noexcept
+    auto operator co_await(const Quantity<units::Second, T, Ratio>& duration) noexcept
     {
         return std::suspend_never{};
     }
