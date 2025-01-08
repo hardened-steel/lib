@@ -115,4 +115,52 @@ namespace lib {
     {
         constexpr static inline auto name = "lib::Span<" + type_name<T> + ">";
     };
+
+    template<>
+    struct TypeName<std::uint8_t>
+    {
+        constexpr static inline StaticString name = "u8";
+    };
+
+    template<>
+    struct TypeName<std::int8_t>
+    {
+        constexpr static inline StaticString name = "i8";
+    };
+
+    template<>
+    struct TypeName<std::uint16_t>
+    {
+        constexpr static inline StaticString name = "u16";
+    };
+
+    template<>
+    struct TypeName<std::int16_t>
+    {
+        constexpr static inline StaticString name = "i16";
+    };
+
+    template<>
+    struct TypeName<std::uint32_t>
+    {
+        constexpr static inline StaticString name = "u32";
+    };
+
+    template<>
+    struct TypeName<std::int32_t>
+    {
+        constexpr static inline StaticString name = "i32";
+    };
+
+    template<>
+    struct TypeName<std::uint64_t>
+    {
+        constexpr static inline StaticString name = "u64";
+    };
+
+    template<>
+    struct TypeName<std::int64_t>
+    {
+        constexpr static inline StaticString name = "i64";
+    };
 }

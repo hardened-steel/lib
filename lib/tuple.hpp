@@ -33,14 +33,14 @@ namespace lib {
     template<class Tuple, typename = Require<is_tuple<Tuple>>>
     constexpr auto&& head(Tuple&& tuple) noexcept
     {
-        return std::get<0>(tuple);
+        return std::get<0>(std::forward<Tuple>(tuple));
     }
 
     namespace details {
         template<class Tuple, std::size_t ...I>
         constexpr auto tail(Tuple&& tuple, std::index_sequence<I...>) noexcept
         {
-            return std::tie(std::get<I + 1>(tuple)...);
+            return std::tie(std::get<I + 1>(std::forward<Tuple>(tuple))...);
         }
     }
 
