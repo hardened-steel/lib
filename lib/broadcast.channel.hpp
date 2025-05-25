@@ -9,7 +9,7 @@ namespace lib {
     {
     public:
         using Type = T;
-        using SEvent = Event::Mux<typename Channels::SEvent& ...>;
+        using SEvent = EventMux<typename Channels::SEvent& ...>;
     private:
         std::tuple<Channels&...> channels;
         mutable SEvent events;

@@ -1,6 +1,7 @@
 #pragma once
 #include <variant>
 #include <bitset>
+#include <numeric>
 #include <stdexcept>
 #include <lib/event.hpp>
 #include <lib/buffer.hpp>
@@ -15,40 +16,46 @@ namespace lib {
         Channel& channel;
     };
 
-    template<class Channel>
-    class IChannel
+    template<class Event, class TChannel>
+    std::size_t wait(Subscriber<Event>& subscriber, const TChannel& channel) noexcept
     {
-    public:
-        template<class Event, class TChannel>
-        static bool rwait(Subscriber<Event>& subscriber, const TChannel& channel) noexcept
-        {
-            subscriber.reset();
+        subscriber.reset();
+        std::size_t ready = channel.poll();
 
+        if (!ready) {
             bool closed = channel.closed();
-            bool ready = channel.rpoll();
-
-            while(!closed && !ready) {
+            while (!closed) {
                 subscriber.wait();
                 subscriber.reset();
 
+                ready = channel.poll();
+                if (ready) {
+                    break;
+                }
                 closed = channel.closed();
-                ready = channel.rpoll();
             }
-            return ready;
         }
+        return ready;
+    }
 
+    constexpr inline struct IChannel {} ichannel;
+    constexpr inline struct OChannel {} ochannel;
+
+    template<class Channel>
+    class IChannelBase
+    {
+    public:
         auto recv()
         {
             auto& self = *static_cast<Channel*>(this);
-            if (self.rpoll()) {
-                return self.urecv();
+            if (self.poll(ichannel)) {
+                return self.peek(ichannel);
             }
 
-            Handler handler;
-            Subscriber subscriber(self.revent(), handler);
+            Subscriber subscriber(self.event(ichannel));
 
-            if (rwait(subscriber, self)) {
-                return self.urecv();
+            if (wait(subscriber, self)) {
+                return self.peek(ichannel);
             }
             throw std::out_of_range("channel is closed");
         }
@@ -59,7 +66,7 @@ namespace lib {
         }
     };
 
-    template<class T>
+    /*template<class T>
     class VIChannel: public IChannel<VIChannel<T>>
     {
         struct Interface
@@ -129,47 +136,123 @@ namespace lib {
     };
 
     template<class Channel>
-    VIChannel(Channel& channel) -> VIChannel<typename Channel::Type>;
+    VIChannel(Channel& channel) -> VIChannel<typename Channel::Type>;*/
 
     template<class ...Channels>
-    class IChannelAny: public IChannel<IChannelAny<Channels...>>
+    class ChannelAny: public IChannelBase<ChannelAny<Channels...>>
     {
     public:
-        using Type = std::variant<typename Channels::Type...>;
-        using REvent = Event::Mux<typename Channels::REvent&...>;
+        using Type = std::variant<typename Channels::Type ...>;
+        using Event = EventMux<typename Channels::Event ...>;
+
     private:
         std::tuple<Channels&...> channels;
-        mutable REvent           events;
+        mutable Event            events;
         mutable std::size_t      current = 0;
+        mutable std::array<std::size_t, sizeof...(Channels)> sizes{};
+
     public:
-        constexpr IChannelAny(Channels&... channels) noexcept
+        constexpr ChannelAny(Channels&... channels) noexcept
         : channels{channels...}
-        , events{channels.revent()...}
+        , events{channels.event()...}
+        {}
+
+        std::size_t poll() const noexcept
         {
+            return poll(std::make_index_sequence<sizeof...(Channels)>{});
         }
-        bool rpoll() const noexcept
-        {
-            return rpoll(std::make_index_sequence<sizeof...(Channels)>{});
-        }
+
         bool closed() const noexcept
         {
             return closed(std::make_index_sequence<sizeof...(Channels)>{});
         }
+
         void close() noexcept
         {
             close(std::make_index_sequence<sizeof...(Channels)>{});
         }
-        REvent& revent() const noexcept
+
+        Event& event() const noexcept
         {
             return events;
         }
-        Type urecv()
+
+        Type peek()
         {
-            return urecv(std::make_index_sequence<sizeof...(Channels)>{});
+            return peek(std::make_index_sequence<sizeof...(Channels)>{});
         }
+
+        void next()
+        {
+            return next(std::make_index_sequence<sizeof...(Channels)>{});
+        }
+
     private:
         template<std::size_t ...I>
-        unsigned closed(std::index_sequence<I...>) const noexcept
+        std::size_t poll(std::index_sequence<I...>) const noexcept
+        {
+            using Function = bool (*)(const ChannelAny*);
+            static const std::array<Function, sizeof...(Channels)> function {
+                [] (const ChannelAny* channel) {
+                    return std::get<I>(channel->channels).poll();
+                }...
+            };
+
+            if (sizes[current] != 0) {
+                return std::accumulate(sizes.begin(), sizes.end(), 0);
+            }
+
+            std::size_t max = 0;
+            for (std::size_t i = 0; i < sizeof...(Channels); ++i) {
+                if (sizes[i] == 0) {
+                    std::size_t size = sizes[i] = function[i](this);
+                    events.set_reset_mask(i, size != 0);
+                    if (size > max) {
+                        current = i;
+                        max = size;
+                    }
+                }
+            }
+            return std::accumulate(sizes.begin(), sizes.end(), 0);
+        }
+
+        template<std::size_t ...I>
+        Type peek(std::index_sequence<I...>)
+        {
+            using Function = Type (*)(ChannelAny*);
+            static const std::array<Function, sizeof...(Channels)> function {
+                [] (ChannelAny* channel) -> Type& {
+                    return Type(std::in_place_index<I>, std::get<I>(channel->channels).peek());
+                }...
+            };
+            return function[current](this);
+        }
+
+        template<std::size_t ...I>
+        void next(std::index_sequence<I...>)
+        {
+            using Function = Type (*)(ChannelAny*);
+            static const std::array<Function, sizeof...(Channels)> function {
+                [] (ChannelAny* channel) -> Type& {
+                    std::get<I>(channel->channels).next();
+                }...
+            };
+            function[current](this);
+            sizes[current] -= 1;
+
+            for (std::size_t i = 0; i < sizeof...(Channels); ++i) {
+                if (sizes[current] != 0) {
+                    break;
+                }
+                current += 1;
+                if (current == sizeof...(Channels)) {
+                    current = 0;
+                }
+            }
+        }
+
+        template<std::size_t ...I>
+        bool closed(std::index_sequence<I...>) const noexcept
         {
             return (std::get<I>(channels).closed() && ...);
         }
@@ -179,85 +262,101 @@ namespace lib {
         {
             (std::get<I>(channels).close(), ...);
         }
-
-        template<std::size_t ...I>
-        bool rpoll(std::index_sequence<I...>) const noexcept
-        {
-            using PollFn = bool (*)(const IChannelAny*);
-            static const std::array<PollFn, sizeof...(Channels)> poll {
-                [](const IChannelAny* channel) {
-                    return std::get<I>(channel->channels).rpoll();
-                }...
-            };
-
-            for (std::size_t i = 0; i < sizeof...(Channels); ++i) {
-                if (poll[current](this)) {
-                    return true;
-                }
-                current += 1;
-                if (current == sizeof...(Channels)) {
-                    current = 0;
-                }
-            }
-            return false;
-        }
-        
-        template<std::size_t ...I>
-        Type urecv(std::index_sequence<I...>)
-        {
-            using RecvFn = Type (*)(IChannelAny*);
-            static const std::array<RecvFn, sizeof...(Channels)> recv {
-                [](IChannelAny* channel) {
-                    return Type(std::in_place_index<I>, std::get<I>(channel->channels).urecv());
-                }...
-            };
-            return recv[current](this);
-        }
     };
     template<typename... Channels>
-    IChannelAny(Channels&... channels) -> IChannelAny<Channels...>;
+    ChannelAny(Channels&... channels) -> ChannelAny<Channels...>;
 
     template<class ...Channels>
-    class IChannelAll: public IChannel<IChannelAll<Channels...>>
+    class ChannelAll: public IChannelBase<ChannelAll<Channels...>>
     {
     public:
         using Type = std::tuple<typename Channels::Type...>;
-        using REvent = Event::Mux<typename Channels::REvent&...>;
+        using Event = EventMux<typename Channels::REvent&...>;
+
     private:
         std::tuple<Channels&...>                 channels;
-        mutable REvent                           events;
+        mutable Event                            events;
         mutable std::bitset<sizeof...(Channels)> states;
+        mutable std::array<std::size_t, sizeof...(Channels)> sizes{};
+
     public:
-        constexpr IChannelAll(Channels&... channels) noexcept
+        constexpr ChannelAll(Channels&... channels) noexcept
         : channels{channels...}
-        , events{channels.revent()...}
+        , events{channels.event()...}
+        {}
+
+        std::size_t poll() const noexcept
         {
+            return poll(std::make_index_sequence<sizeof...(Channels)>{});
         }
-        bool rpoll() const noexcept
-        {
-            return rpoll(std::make_index_sequence<sizeof...(Channels)>{});
-        }
+
         bool closed() const noexcept
         {
             return closed(std::make_index_sequence<sizeof...(Channels)>{});
         }
+
         void close() noexcept
         {
             close(std::make_index_sequence<sizeof...(Channels)>{});
         }
-        REvent& revent() const noexcept
+
+        Event& event() const noexcept
         {
             return events;
         }
-        Type urecv()
+
+        Type peek()
         {
-            return urecv(std::make_index_sequence<sizeof...(Channels)>{});
+            return peek(std::make_index_sequence<sizeof...(Channels)>{});
         }
+
+        void next()
+        {
+            return next(std::make_index_sequence<sizeof...(Channels)>{});
+        }
+
     private:
         template<std::size_t ...I>
-        unsigned closed(std::index_sequence<I...>) const noexcept
+        std::size_t poll(std::index_sequence<I...>) const noexcept
         {
-            return ((std::get<I>(channels).closed() && !std::get<I>(channels).rpoll()) || ...);
+            using Function = bool (*)(const ChannelAll*);
+            static const std::array<Function, sizeof...(Channels)> function {
+                [] (const ChannelAll* channel) {
+                    return std::get<I>(channel->channels).poll();
+                }...
+            };
+
+            std::size_t min = std::numeric_limits<std::size_t>::max();
+            for (std::size_t i = 0; i < sizeof...(Channels); ++i) {
+                std::size_t size = sizes[i];
+                if (size == 0) {
+                    size = function[i](this);
+                    events.set_reset_mask(i, size != 0);
+                    sizes[i] = size;
+                }
+                if (size < min) {
+                    min = size;
+                }
+            }
+            return min;
+        }
+
+        template<std::size_t ...I>
+        Type peek(std::index_sequence<I...>)
+        {
+            return Type(std::get<I>(channels).peek() ...);
+        }
+
+        template<std::size_t ...I>
+        void next(std::index_sequence<I...>)
+        {
+            (std::get<I>(channels).next(), ...);
+        }
+
+        template<std::size_t ...I>
+        bool closed(std::index_sequence<I...>) const noexcept
+        {
+            return (std::get<I>(channels).closed() && ...);
         }
 
         template<std::size_t ...I>
@@ -265,26 +364,9 @@ namespace lib {
         {
             (std::get<I>(channels).close(), ...);
         }
-
-        template<std::size_t ...I>
-        bool rpoll(std::index_sequence<I...>) const noexcept
-        {
-            if(states.all()) {
-                return true;
-            }
-            ((states[I] = states.test(I) || std::get<I>(channels).rpoll()), ...);
-            return states.all();
-        }
-
-        template<std::size_t ...I>
-        Type urecv(std::index_sequence<I...>)
-        {
-            states.reset();
-            return std::make_tuple(std::get<I>(channels).urecv()...);
-        }
     };
     template<typename... Channels>
-    IChannelAll(Channels&... channels) -> IChannelAll<Channels...>;
+    ChannelAll(Channels&... channels) -> ChannelAll<Channels...>;
 
     template<class Channel>
     class IRange
@@ -294,7 +376,6 @@ namespace lib {
         using Value = std::remove_cv_t<std::remove_reference_t<typename Channel::Type>>;
 
         Channel& channel;
-        Handler  handler;
         Subscriber<typename Channel::REvent> subscriber;
 
         RawStorage<Value> storage;
@@ -354,7 +435,7 @@ namespace lib {
     public:
         constexpr IRange(Channel& channel) noexcept
         : channel(channel)
-        , subscriber(channel.revent(), handler)
+        , subscriber(channel.revent())
         {}
 
         auto begin()
@@ -405,8 +486,7 @@ namespace lib {
             if (self.spoll()) {
                 return self.usend(std::forward<T>(value));
             }
-            Handler handler;
-            Subscriber subscriber(self.sevent(), handler);
+            Subscriber subscriber(self.sevent());
 
             if (swait(subscriber, self)) {
                 self.usend(std::forward<T>(value));

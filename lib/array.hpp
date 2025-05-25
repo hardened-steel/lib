@@ -87,9 +87,9 @@ namespace lib {
         : m_ptr(array), m_size(N)
         {}
         
-        template<std::size_t N>
-        constexpr Span(std::array<T, N>& array) noexcept
-        : m_ptr(array.data()), m_size(array.size())
+        template<class Container>
+        constexpr Span(Container& container) noexcept
+        : m_ptr(std::data(container)), m_size(std::size(container))
         {}
 
         constexpr Span(const Span& other) = default;

@@ -11,33 +11,29 @@ TEST(lib, event)
     {
         ASSERT_FALSE(event_a.poll());
         lib::EventMux mux {event_a, event_b, event_c, event_d};
-        lib::Handler handler;
-        mux.subscribe(&handler);
+        lib::Subscriber subscriber(mux);
 
         auto result = std::async([&] { event_a.emit(); });
-        handler.wait();
+        subscriber.wait();
         result.get();
-        mux.subscribe(nullptr);
     }
     {
         ASSERT_FALSE(event_a.poll());
         lib::EventMux mux {event_a, event_b, event_c, event_d};
-        lib::Handler handler;
-        mux.subscribe(&handler);
+        lib::Subscriber subscriber(mux);
 
         auto result = std::async([&] { event_a.emit(); });
-        handler.wait();
+        subscriber.wait();
         result.get();
     }
     {
         lib::EventMux mux {event_a, event_b, event_c, event_d};
-        lib::Handler handler;
-        mux.subscribe(&handler);
+        lib::Subscriber subscriber(mux);
 
         auto result = std::async([&] { event_c.emit(); event_b.emit(); });
-        handler.wait();
+        subscriber.wait();
         ASSERT_TRUE(event_c.poll() || event_b.poll());
-        handler.wait();
+        subscriber.wait();
         ASSERT_TRUE(event_c.poll() && event_b.poll());
         result.get();
     }

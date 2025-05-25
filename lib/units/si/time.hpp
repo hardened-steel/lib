@@ -16,7 +16,7 @@ namespace lib {
                 return string("s");
             }
         };
-    
+
         struct Minute
         {
             using Dimension = Minute;
@@ -35,7 +35,7 @@ namespace lib {
         {
             using Coefficient = std::ratio<60>;
         };
-    
+
         struct Hour
         {
             using Dimension = Hour;
@@ -58,7 +58,7 @@ namespace lib {
         template<>
         struct Convert<Hour, Second>
         {
-            using Coefficient = std::ratio<60 * 60>;
+            using Coefficient = std::ratio<3600>;
         };
 
         using namespace std::chrono_literals;
@@ -68,10 +68,11 @@ namespace lib {
     class Quantity<units::Second, T, Ratio>: public QuantityBase<units::Second, T, Ratio>
     {
         using Base = QuantityBase<units::Second, T, Ratio>;
+
     public:
         using Base::Base;
         using Base::operator=;
-        
+
         template<class IRatio>
         constexpr Quantity(std::chrono::duration<T, IRatio> duration) noexcept
         : Quantity(Quantity<units::Second, T, IRatio>(duration.count()))
@@ -83,6 +84,7 @@ namespace lib {
             Base::quantity = Quantity<units::Second, T, IRatio>(duration.count());
             return *this;
         }
+
     public:
         constexpr operator std::chrono::duration<T, std::ratio<1>>() const noexcept
         {
@@ -149,7 +151,7 @@ namespace lib {
     };
 
     template<class T>
-    Quantity(std::chrono::duration<T, std::ratio<60 * 60>>) -> Quantity<units::Hour, T>;
+    Quantity(std::chrono::duration<T, std::ratio<3600>>) -> Quantity<units::Hour, T>;
 
     template<class T, class Ratio>
     Quantity(std::chrono::duration<T, Ratio>) -> Quantity<units::Second, T, Ratio>;
