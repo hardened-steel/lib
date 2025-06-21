@@ -1,11 +1,12 @@
 #pragma once
+#if false
 #include <numeric>
 #include <lib/buffered.channel.hpp>
 #include <lib/concept.hpp>
 
 namespace lib {
 
-    template<class T, class ...Channels>
+    template <class T, class ...Channels>
     class AggregateChannel: public IChannelBase<AggregateChannel<T, Channels...>>
     {
     public:
@@ -52,7 +53,7 @@ namespace lib {
             return next(std::make_index_sequence<sizeof...(Channels)>{});
         }
     private:
-        template<std::size_t ...I>
+        template <std::size_t ...I>
         std::size_t poll(std::index_sequence<I...>) const noexcept
         {
             using Function = bool (*)(const AggregateChannel*);
@@ -80,7 +81,7 @@ namespace lib {
             return std::accumulate(sizes.begin(), sizes.end(), 0);
         }
 
-        template<std::size_t ...I>
+        template <std::size_t ...I>
         Type& peek(std::index_sequence<I...>)
         {
             using Function = Type (*)(AggregateChannel*);
@@ -92,7 +93,7 @@ namespace lib {
             return function[current](this);
         }
 
-        template<std::size_t ...I>
+        template <std::size_t ...I>
         void next(std::index_sequence<I...>)
         {
             using Function = Type (*)(AggregateChannel*);
@@ -115,19 +116,20 @@ namespace lib {
             }
         }
 
-        template<std::size_t ...I>
+        template <std::size_t ...I>
         bool closed(std::index_sequence<I...>) const noexcept
         {
             return (std::get<I>(channels).closed() && ...);
         }
 
-        template<std::size_t ...I>
+        template <std::size_t ...I>
         void close(std::index_sequence<I...>) noexcept
         {
             (std::get<I>(channels).close(), ...);
         }
     };
 
-    template<class ...Channels>
+    template <class ...Channels>
     AggregateChannel(Channels& ...channels) -> AggregateChannel<std::common_type_t<typename Channels::Type ...>, Channels...>;
 }
+#endif

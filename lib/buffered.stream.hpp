@@ -1,18 +1,19 @@
 #pragma once
+#if false
 #include <lib/buffer.hpp>
 #include <lib/channel.hpp>
 #include <lib/buffered.channel.hpp>
 
 namespace lib {
-    template<class T, std::size_t N>
+    template <class T, std::size_t N>
     class BufferedStream
     {
-        
+
     public:
-        
+
     };
 
-    template<class T>
+    template <class T>
     class IStream
     {
         BufferedChannel<T, 8> i_buffers;
@@ -21,7 +22,7 @@ namespace lib {
 
     };
 
-    template<class Buffers, class IStream>
+    template <class Buffers, class IStream>
     class StreamReceiver
     {
         Buffers& buffers;
@@ -31,3 +32,4 @@ namespace lib {
 
     };
 }
+#endif

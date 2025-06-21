@@ -7,7 +7,7 @@
 #include <lib/coro.hpp>
 #include <lib/data-structures/dl-list.hpp>
 
-template<class Channel>
+template <class Channel>
 struct IChannelAwaiter
 {
     using Type = typename Channel::Type;
@@ -27,13 +27,13 @@ struct IChannelAwaiter
     }
 };
 
-template<class Channel>
+template <class Channel>
 auto operator co_await (Channel& channel) noexcept
 {
     return IChannelAwaiter{&channel};
 }
 
-template<class T>
+template <class T>
 class ChannelGenerator: public lib::IChannel<ChannelGenerator<T>>
 {
 public:
@@ -59,13 +59,13 @@ public:
             return std::suspend_always{};
         }
 
-        template<class TArg>
+        template <class TArg>
         auto yield_value(TArg&& arg)
         {
             value.emplace(std::forward<TArg>(arg));
             return std::suspend_always{};
         }
-        template<class TArg>
+        template <class TArg>
         void return_value(TArg&& arg)
         {
             value.emplace(std::forward<TArg>(arg));
@@ -160,7 +160,7 @@ TEST(lib, coro_task)
     scheduler.run();
 }
 
-template<class Channel>
+template <class Channel>
 lib::Task<void> read_all(Channel& channel)
 {
     for (const auto& value: lib::irange(channel)) {

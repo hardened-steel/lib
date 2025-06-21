@@ -1,12 +1,15 @@
 #pragma once
+#if false
 #include <lib/units.hpp>
+#include <lib/units/si/time.hpp>
 #include <lib/units/velocity.hpp>
 
+
 namespace lib::units {
-    template<class Length>
+    template <class Length>
     struct Acceleration
     {
-        using Dimension = Divide<Velocity<Length>, Time>;
+        using Dimension = Divide<Velocity<Length>, Second>;
         constexpr static auto name() noexcept
         {
             return string("acceleration");
@@ -17,13 +20,13 @@ namespace lib::units {
         }
     };
 
-    template<class Length>
-    struct Dimension<Multiplying<Velocity<Length>, TDegree<Time, 2>>>
+    template <class Length>
+    struct Dimension<Multiplying<Velocity<Length>, TDegree<Second, 2>>>
     {
         using Type = Acceleration<Length>;
     };
 
-    template<char ...Chars>
+    template <char ...Chars>
     constexpr auto operator ""_a() noexcept
     {
         using Parser = literal::Parser<Chars...>;
@@ -35,3 +38,4 @@ namespace lib::units {
         return Quantity<Acceleration<Length>, long double>(quantity);
     }
 }
+#endif

@@ -3,13 +3,13 @@
 #include <lib/static.string.hpp>
 
 namespace lib {
-    template<class Lhs, class Rhs>
+    template <class Lhs, class Rhs>
     class LazyString
     {
         Lhs lhs;
         Rhs rhs;
     public:
-        template<class TLhs, class TRhs>
+        template <class TLhs, class TRhs>
         constexpr LazyString(TLhs&& lhs, TRhs&& rhs) noexcept
         : lhs(std::forward<TLhs>(lhs))
         , rhs(std::forward<TRhs>(rhs))
@@ -157,31 +157,31 @@ namespace lib {
         }
     };
 
-    template<class Lhs, class Rhs>
+    template <class Lhs, class Rhs>
     LazyString(Lhs&& lhs, Rhs&& rhs) -> LazyString<std::remove_cv_t<std::remove_reference_t<Lhs>>, std::remove_cv_t<std::remove_reference_t<Rhs>>>;
 
-    template<class T>
+    template <class T>
     struct IsStringF
     {
         constexpr static inline bool value = std::is_convertible_v<T, std::string_view>;
     };
 
-    template<class T>
+    template <class T>
     constexpr inline bool is_string = IsStringF<T>::value;
 
-    template<std::size_t N>
+    template <std::size_t N>
     struct IsStringF<StaticString<N>>
     {
         constexpr static inline bool value = true;
     };
 
-    template<class Lhs, class Rhs>
+    template <class Lhs, class Rhs>
     struct IsStringF<LazyString<Lhs, Rhs>>
     {
         constexpr static inline bool value = true;
     };
 
-    template<
+    template <
         class String,
         typename = lib::Require<
             is_string<
@@ -194,13 +194,13 @@ namespace lib {
         return std::forward<String>(string);
     }
 
-    template<std::size_t N>
+    template <std::size_t N>
     constexpr auto convert_string(RawArray<const char, N> string) noexcept
     {
         return std::string_view(string);
     }
 
-    template<
+    template <
         class Lhs, class Rhs,
         typename = lib::Require<
             is_string<std::remove_cv_t<std::remove_reference_t<Lhs>>>,
@@ -212,7 +212,7 @@ namespace lib {
         return LazyString(convert_string(std::forward<Lhs>(lhs)), convert_string(std::forward<Rhs>(rhs)));
     }
 
-    template<
+    template <
         class Lhs, class Rhs,
         typename = lib::Require<is_string<Lhs>, is_string<Rhs>>
     >
@@ -229,7 +229,7 @@ namespace lib {
         return false;
     }
 
-    template<
+    template <
         class Lhs, class Rhs,
         typename = lib::Require<is_string<Lhs>, is_string<Rhs>>
     >

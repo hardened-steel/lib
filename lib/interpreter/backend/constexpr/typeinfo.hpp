@@ -4,10 +4,10 @@
 
 namespace lib::interpreter::const_expr {
 
-    template<class T>
+    template <class T>
     struct TypeTrait;
 
-    template<>
+    template <>
     struct TypeTrait<std::uint32_t>
     {
         constexpr static inline auto name = lib::StaticString("u32");

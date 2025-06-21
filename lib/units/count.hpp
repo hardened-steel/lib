@@ -18,21 +18,21 @@ namespace lib {
             }
         };
 
-        template<>
+        template <>
         struct Dimension<Count::Dimension>
         {
             using Type = Count;
         };
     }
 
-    template<class T, class Ratio>
+    template <class T, class Ratio>
     class Quantity<units::Count, T, Ratio>: public QuantityBase<units::Count, T, Ratio>
     {
         using Base = QuantityBase<units::Count, T, Ratio>;
     public:
         using Base::Base;
         using Base::operator=;
-        
+
         constexpr Quantity(T quantity) noexcept
         : Base(quantity)
         {}
@@ -48,10 +48,10 @@ namespace lib {
         }
     };
 
-    template<class T>
+    template <class T>
     Quantity(T value) -> Quantity<units::Count, T>;
 
-    template<
+    template <
         class Unit, class A, class Ratio, class B,
         typename = lib::Require<
             std::is_integral_v<B>
@@ -64,7 +64,7 @@ namespace lib {
         return a * CommonQuantity(b);
     }
 
-    template<
+    template <
         class Unit, class A, class Ratio, class B,
         typename = lib::Require<
             std::is_integral_v<A>
@@ -77,7 +77,7 @@ namespace lib {
         return CommonQuantity(a) * b;
     }
 
-    template<
+    template <
         class Unit, class A, class Ratio, class B,
         typename = lib::Require<
             std::is_integral_v<B>
@@ -90,7 +90,7 @@ namespace lib {
         return a / CommonQuantity(b);
     }
 
-    template<
+    template <
         class Unit, class A, class Ratio, class B,
         typename = lib::Require<
             std::is_integral_v<A>

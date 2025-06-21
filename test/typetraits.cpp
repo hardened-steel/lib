@@ -40,7 +40,7 @@ TEST(typetraits, For)
     using namespace lib::typetraits;
 
     using L = List<int, void, float, double>;
-    
+
 }
 
 TEST(typetraits, Set)
@@ -90,7 +90,7 @@ TEST(typetraits, Map)
 
 using namespace lib::typetraits;
 
-template<class Param>
+template <class Param>
 struct Factorial: interpreter::Function
 {
     struct Result;
@@ -118,7 +118,7 @@ struct ErrorFunction: interpreter::Function
     >;
 };
 
-template<class A, class B>
+template <class A, class B>
 struct FooFunction: interpreter::Function
 {
     using Body = Scope<
@@ -126,7 +126,7 @@ struct FooFunction: interpreter::Function
     >;
 };
 
-template<class IValue>
+template <class IValue>
 struct BarFunction: interpreter::Function
 {
     struct Result;

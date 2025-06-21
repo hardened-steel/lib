@@ -22,7 +22,7 @@ namespace lib {
             return reinterpret_cast<const T*>(buffer);
         }
 
-        template<class ...TArgs>
+        template <class ...TArgs>
         T* emplace(TArgs&& ...args)
         noexcept(std::is_nothrow_constructible_v<T, TArgs...>)
         {
@@ -41,26 +41,26 @@ namespace lib {
     private:
         alignas(Ts...) std::byte buffer[std::max({sizeof(Ts)...})]; // NOLINT
     public:
-        template<class T>
+        template <class T>
         T* ptr() noexcept
         {
             return reinterpret_cast<T*>(buffer);
         }
 
-        template<class T>
+        template <class T>
         const T* ptr() const noexcept
         {
             return reinterpret_cast<const T*>(buffer);
         }
 
-        template<class T, class ...TArgs>
+        template <class T, class ...TArgs>
         T* emplace(TArgs&& ...args)
         noexcept(std::is_nothrow_constructible_v<T, TArgs...>)
         {
             return std::construct_at(ptr<T>(), std::forward<TArgs>(args)...);
         }
 
-        template<class T>
+        template <class T>
         void destroy() noexcept
         {
             std::destroy_at(ptr<T>());

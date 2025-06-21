@@ -1,8 +1,9 @@
 #pragma once
 #include <type_traits>
 
+
 namespace lib {
-    template<bool ...Conditions>
+    template <bool ...Conditions>
     using Require = std::enable_if_t<(Conditions && ...), void>;
 
     // Primary template handles all types not supporting the operation.
@@ -20,7 +21,7 @@ namespace lib {
         template <typename T>
         using has_toString_t = decltype(std::declval<T>().toString());
 
-        template<class T>
+        template <class T>
         constexpr inline bool has_toString = lib::detect<T, has_toString_t>;
     */
 }

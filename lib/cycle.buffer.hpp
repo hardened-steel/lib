@@ -6,13 +6,13 @@
 
 namespace lib {
 
-    template<class T, std::size_t N>
+    template <class T, std::size_t N>
     class CycleBuffer;
 
     struct CycleBufferEndIterator {};
     constexpr inline CycleBufferEndIterator cycle_buffer_end = {};
 
-    template<class T, std::size_t N>
+    template <class T, std::size_t N>
     class CycleBufferIterator
     {
     protected:
@@ -100,7 +100,7 @@ namespace lib {
         }
     };
 
-    template<class T, std::size_t N>
+    template <class T, std::size_t N>
     class CycleBuffer
     {
         alignas(64) std::atomic<std::size_t> m_recv_index{0};
@@ -170,7 +170,7 @@ namespace lib {
             }
         }
     public:
-        
+
         CycleBufferIterator<const T, N + 1> begin() const noexcept
         {
             return {array[0].ptr(), m_recv_index.load(std::memory_order_relaxed), rsize()};

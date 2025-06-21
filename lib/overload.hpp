@@ -5,18 +5,18 @@
 #include <variant>
 
 namespace lib {
-    template<class... Ts>
+    template <class... Ts>
     struct Overload: Ts...
     {
         using Ts::operator()...;
     };
 
-    template<class... Ts>
+    template <class... Ts>
     Overload(Ts...) -> Overload<Ts...>;
 
     namespace details {
 
-        template<class T, class Tuple, std::size_t ...I>
+        template <class T, class Tuple, std::size_t ...I>
         auto rswitch(T index, const Tuple& cases, std::index_sequence<I...>)
         {
             using Result = std::common_type_t<
@@ -28,7 +28,7 @@ namespace lib {
             return functions[index](cases);
         }
 
-        template<class ...Types, class Tuple, std::size_t ...I>
+        template <class ...Types, class Tuple, std::size_t ...I>
         auto rswitch(const std::variant<Types...>& value, const Tuple& cases, std::index_sequence<I...>)
         {
             using Result = std::common_type_t<
@@ -41,7 +41,7 @@ namespace lib {
             return functions[value.index()](value, cases);
         }
 
-        template<class ...Types, class Tuple, std::size_t ...I>
+        template <class ...Types, class Tuple, std::size_t ...I>
         auto rswitch(std::variant<Types...>&& value, const Tuple& cases, std::index_sequence<I...>)
         {
             using Result = std::common_type_t<
@@ -56,19 +56,19 @@ namespace lib {
 
     }
 
-    template<class T, class ...TCases>
+    template <class T, class ...TCases>
     auto rswitch(T index, TCases&& ...cases)
     {
         return details::rswitch(index, std::make_tuple(std::forward<TCases>(cases)...), std::make_index_sequence<sizeof...(TCases)>{});
     }
 
-    template<class ...Types, class ...TCases>
+    template <class ...Types, class ...TCases>
     auto rswitch(const std::variant<Types...>& value, TCases&& ...cases)
     {
         return details::rswitch(value, std::make_tuple(std::forward<TCases>(cases)...), std::make_index_sequence<sizeof...(TCases)>{});
     }
 
-    template<class ...Types, class ...TCases>
+    template <class ...Types, class ...TCases>
     auto rswitch(std::variant<Types...>&& value, TCases&& ...cases)
     {
         return details::rswitch(std::move(value), std::make_tuple(std::forward<TCases>(cases)...), std::make_index_sequence<sizeof...(TCases)>{});

@@ -1,27 +1,61 @@
 #pragma once
-#include <atomic>
-#include <bitset>
-#include <tuple>
-
+#include <lib/test.hpp>
 #include <lib/data-structures/dl-list.hpp>
 #include <lib/semaphore.hpp>
 #include <lib/buffer.hpp>
 #include <lib/mutex.hpp>
 
+#include <atomic>
+#include <bitset>
+#include <tuple>
+
+
 namespace lib {
 
-    template<class Event>
+    enum class EventType: std::uint8_t
+    {
+        Never  = 0b000,
+        Simple = 0b001,
+        Time   = 0b010,
+        System = 0b100,
+    };
+
+    template <EventType E1, EventType E2, EventType E3>
+    struct Events {};
+
+    template <EventType E>
+    using MakeEvents = Events<
+        // EventType::Simple, EventType::Time, EventType::System
+        static_cast<EventType>(static_cast<std::uint8_t>(E) & static_cast<std::uint8_t>(EventType::Simple)),
+        static_cast<EventType>(static_cast<std::uint8_t>(E) & static_cast<std::uint8_t>(EventType::Time)),
+        static_cast<EventType>(static_cast<std::uint8_t>(E) & static_cast<std::uint8_t>(EventType::System))
+    >;
+
+    constexpr auto operator | (EventType lhs, EventType rhs) noexcept
+    {
+        using Type = std::underlying_type_t<EventType>;
+        return static_cast<EventType>(static_cast<Type>(lhs) | static_cast<Type>(rhs));
+    }
+
+    template <class EType>
+    class Handler;
+
+    template <>
+    class Handler<Events<EventType::Never, EventType::Never, EventType::Never>>
+    {};
+
+    template <class Event>
     class Subscriber
     {
-        using Handler = typename Event::Handler;
-        using Message = typename Event::Message;
-    private:
         Event& event;
-        Handler handler;
+        Handler<MakeEvents<Event::type>> handler;
         std::size_t count = 0;
+
     public:
-        explicit Subscriber(Event& event) noexcept
+        template <class ...TArgs>
+        explicit Subscriber(Event& event, TArgs&& ...args) noexcept
         : event(event)
+        , handler(std::forward<TArgs>(args)...)
         {
             event.subscribe(&handler);
         }
@@ -43,42 +77,11 @@ namespace lib {
         }
     };
 
-    template<class Event>
+    template <class Event>
     Subscriber(Event& event) -> Subscriber<Event>;
 
-    enum class EventType: std::uint8_t
-    {
-        Empty  = 0,
-        Simple = 0b001,
-        Time   = 0b010,
-        System = 0b100,
-    };
 
-    template<EventType ...ETypes>
-    struct Events {};
-
-    template<EventType E>
-    using MakeEvents = Events<
-        // EventType::Simple, EventType::Time, EventType::System
-        static_cast<EventType>(static_cast<std::uint8_t>(E) & static_cast<std::uint8_t>(EventType::Simple)),
-        static_cast<EventType>(static_cast<std::uint8_t>(E) & static_cast<std::uint8_t>(EventType::Time)),
-        static_cast<EventType>(static_cast<std::uint8_t>(E) & static_cast<std::uint8_t>(EventType::System))
-    >;
-
-    constexpr auto operator | (EventType lhs, EventType rhs) noexcept
-    {
-        using Type = std::underlying_type_t<EventType>;
-        return static_cast<EventType>(static_cast<Type>(lhs) | static_cast<Type>(rhs));
-    }
-
-    template<class EType>
-    class Handler;
-
-    template<>
-    class Handler<Events<EventType::Empty, EventType::Empty, EventType::Empty>>
-    {};
-
-    class Event
+    class IEvent
     {
     public:
         constexpr static inline auto type = EventType::Simple;
@@ -89,10 +92,20 @@ namespace lib {
         };
 
     public:
-        void emit() noexcept;
+        virtual void emit() noexcept {};
+        virtual std::size_t subscribe(IHandler* handler) noexcept = 0;
+        virtual std::size_t reset() noexcept = 0;
+    };
+
+    class Event: public IEvent
+    {
+    public:
+        void emit() noexcept final;
+        std::size_t subscribe(IHandler* handler) noexcept final;
+        std::size_t reset() noexcept final;
+
+    public:
         bool poll() const noexcept;
-        std::size_t subscribe(IHandler* handler) noexcept;
-        std::size_t reset() noexcept;
         IHandler* handler() const noexcept;
 
     protected:
@@ -102,19 +115,25 @@ namespace lib {
         std::atomic<std::uintptr_t> signal {0};
     };
 
-    class AlwaysEvent
-    {
-    public:
-        constexpr static inline auto type = EventType::Simple;
-        using IHandler = Event::IHandler;
+    unittest {
+        Event event;
 
+        check(!event.poll());
+        event.emit();
+        check(event.poll());
+        event.reset();
+        check(!event.poll());
+    }
+
+    class AlwaysEvent: public IEvent
+    {
     public:
         bool poll() const noexcept // NOLINT
         {
             return true;
         }
 
-        std::size_t subscribe(IHandler* ihandler) noexcept // NOLINT
+        std::size_t subscribe(IHandler* ihandler) noexcept final // NOLINT
         {
             handler = ihandler;
             if (handler != nullptr) {
@@ -123,49 +142,75 @@ namespace lib {
             return 1;
         }
 
-        std::size_t reset() const noexcept // NOLINT
+        std::size_t reset() noexcept final // NOLINT
         {
             if (handler != nullptr) {
                 handler->notify();
             }
             return 1;
         }
-    
+
     private:
         IHandler* handler = nullptr;
     };
 
-    class NeverEvent
+    class NeverEvent: public IEvent
     {
-    public:
-        constexpr static inline auto type = EventType::Simple;
-        using IHandler = Event::IHandler;
-
     public:
         bool poll() const noexcept { return false; }                              // NOLINT
-        std::size_t subscribe(IHandler* /*handler*/) const noexcept { return 0; } // NOLINT
-        std::size_t reset() const noexcept { return 0; }                          // NOLINT
+        std::size_t subscribe(IHandler* /*handler*/) noexcept final { return 0; } // NOLINT
+        std::size_t reset() noexcept final { return 0; }                          // NOLINT
     };
 
-    class TimeEvent: public data_structures::DLListElement<>
+
+    class ITimeEvent
     {
     public:
-        using Clock = std::chrono::system_clock;
-        using TimePoint = Clock::time_point;
+        using Chrono = std::chrono::system_clock;
+        using TimePoint = Chrono::time_point;
 
     public:
         constexpr static inline auto type = EventType::Time;
-        class IHandler: public Event::IHandler
+        class IHandler: public IEvent::IHandler
         {
         public:
-            virtual bool update_timeout(TimePoint time, TimeEvent* event) = 0;
+            virtual void update_timeout(TimePoint time, ITimeEvent* event) = 0;
         };
 
-    private:
-        TimePoint time_point;
-        IHandler* handler = nullptr;
+        class IClock
+        {
+        public:
+            virtual TimePoint now() noexcept = 0;
+        };
+
+        class Clock: public IClock
+        {
+            TimePoint now() noexcept final
+            {
+                return std::chrono::system_clock::now();
+            }
+        };
+
+        virtual void timeout(TimePoint time) noexcept = 0;
+        virtual std::size_t subscribe(IHandler* handler) noexcept = 0;
+        virtual std::size_t reset() noexcept = 0;
+    };
+
+    class TimeEvent: public ITimeEvent
+    {
         bool signaled = false;
+        TimePoint time_point = TimePoint::max();
+        IHandler* handler = nullptr;
         mutable Mutex mutex;
+
+    private:
+        void timeout(TimePoint time) noexcept final
+        {
+            if (!signaled && handler != nullptr && time >= time_point) {
+                signaled = true;
+                handler->notify();
+            }
+        }
 
     public:
         void emit_on(TimePoint time)
@@ -174,38 +219,28 @@ namespace lib {
 
             time_point = time;
             if (handler != nullptr) {
-                if (handler->update_timeout(time_point, this)) {
-                    if (!signaled) {
-                        signaled = true;
-                        handler->notify();
-                    }
-                }
+                handler->update_timeout(time_point, this);
             }
         }
 
-        void emit()
+        bool poll() const noexcept
         {
             std::lock_guard lock(mutex);
-
-            if (!signaled && handler != nullptr) {
-                signaled = true;
-                handler->notify();
-            }
+            return signaled;
         }
 
-        std::size_t subscribe(IHandler* handler) noexcept
+        std::size_t subscribe(IHandler* handler) noexcept final
         {
             std::lock_guard lock(mutex);
 
+            this->handler = handler;
             if (handler != nullptr) {
                 handler->update_timeout(time_point, this);
-                signaled = false;
             }
-            this->handler = handler;
             return signaled ? 1 : 0;
         }
 
-        std::size_t reset() noexcept
+        std::size_t reset() noexcept final
         {
             std::lock_guard lock(mutex);
             if (signaled) {
@@ -214,23 +249,21 @@ namespace lib {
             }
             return 0;
         }
-
-    private:
     };
 
-    // EventType::Simple, EventType::Time, EventType::System
-    template<>
-    class Handler<Events<EventType::Simple, EventType::Empty, EventType::Empty>>
+
+    template <>
+    class Handler<Events<EventType::Simple, EventType::Never, EventType::Never>>
         : public Event::IHandler
     {
         Semaphore semaphore;
 
     private:
-        void notify() noexcept override
+        void notify() noexcept final
         {
             semaphore.release();
         }
-    
+
     public:
         void wait() noexcept
         {
@@ -245,15 +278,16 @@ namespace lib {
         }
     };
 
-    // EventType::Simple, EventType::Time, EventType::System
-    template<EventType Simple>
-    class Handler<Events<Simple, EventType::Time, EventType::Empty>>
+    template <EventType Simple>
+    class Handler<Events<Simple, EventType::Time, EventType::Never>>
         : public TimeEvent::IHandler
     {
-        Semaphore semaphore;
-
-        mutable std::mutex mutex;
-        TimeEvent* event = nullptr;
+    private:
+        mutable Semaphore semaphore;
+        mutable Mutex mutex;
+    
+        TimeEvent::IClock& clock;
+        ITimeEvent* event = nullptr;
         TimeEvent::TimePoint timeout = TimeEvent::TimePoint::max();
 
     private:
@@ -262,33 +296,35 @@ namespace lib {
             semaphore.release();
         }
 
-        bool update_timeout(TimeEvent::TimePoint time, TimeEvent* wakeup_event) override
+        void update_timeout(TimeEvent::TimePoint time, ITimeEvent* wakeup_event) final
         {
             std::lock_guard lock(mutex);
             if (time < timeout) {
                 event = wakeup_event;
                 timeout = time;
-                return true;
             }
-            return false;
         }
 
         void check_timeout() noexcept
         {
             std::lock_guard lock(mutex);
-            if ((event != nullptr) && (TimeEvent::Clock::now() > timeout)) {
-                event->emit();
+            const auto now = clock.now();
+            if ((event != nullptr) && (now > timeout)) {
+                event->timeout(now);
                 timeout = TimeEvent::TimePoint::max();
             }
         }
 
     public:
+        explicit Handler(TimeEvent::IClock& clock) noexcept
+        : clock(clock)
+        {}
+
         void wait() noexcept
         {
-            check_timeout();
-            if (!semaphore.acquire_until(timeout)) {
+            do {
                 check_timeout();
-            }
+            } while (!semaphore.acquire_until(timeout));
         }
 
         void wait(std::size_t count) noexcept
@@ -299,20 +335,49 @@ namespace lib {
         }
     };
 
-    template<class ...Events>
+    unittest {
+        struct TestClock: public TimeEvent::IClock
+        {
+            using TimePoint = TimeEvent::TimePoint;
+
+            TimePoint time = TimePoint::max();
+
+            TimePoint now() noexcept final
+            {
+                return time;
+            }
+        };
+
+        using namespace std::chrono_literals;
+
+        TestClock clock;
+        TimeEvent event;
+        Subscriber subscriber(event, clock);
+
+        const auto now = TimeEvent::Chrono::now();
+        event.emit_on(now + 1s);
+        clock.time = now + 11s;
+        subscriber.wait();
+    }
+
+
+    template <class ...Events>
     class EventMux
     {
     private:
         std::tuple<Events&...> events;
         std::bitset<sizeof...(Events)> reset_mask;
+
     public:
         constexpr static inline auto type = (Events::type | ...);
+        using IHandler = Handler<MakeEvents<type>>;
+
     public:
         constexpr EventMux(Events& ...events) noexcept
         : events{events...}
         {}
 
-        std::size_t subscribe(Event::IHandler* handler) noexcept
+        std::size_t subscribe(IHandler* handler) noexcept
         {
             return subscribe(handler, std::make_index_sequence<sizeof...(Events)>{});
         }
@@ -328,99 +393,45 @@ namespace lib {
         }
 
     private:
-        template<std::size_t ...I>
-        std::size_t subscribe(Event::IHandler* handler, std::index_sequence<I...>) noexcept
+        template <std::size_t ...I>
+        std::size_t subscribe(IHandler* handler, std::index_sequence<I...>) noexcept
         {
             return (std::get<I>(events).subscribe(handler) + ...);
         }
 
-        template<std::size_t ...I>
+        template <std::size_t ...I>
         std::size_t reset(std::index_sequence<I...>) noexcept
         {
             return ((reset_mask[I] ? 0 : std::get<I>(events).reset()) + ...);
         }
     };
 
-    template<typename... Events>
+    template <typename... Events>
     EventMux(Events& ...events) -> EventMux<Events...>;
 
-    /*class IEvent
-    {
-    public:
-        using Message = std::any;
+    unittest {
+        Event event_a;
+        Event event_b;
+        Event event_c;
+        Event event_d;
 
-        struct BaseHandler
-        {
-            virtual ~BaseHandler() noexcept = default;
-        };
+        EventMux mux {event_a, event_b, event_c, event_d};
+        Subscriber subscriber(mux);
 
-        class IHandler
-        {
-            friend IEvent;
-            std::unique_ptr<BaseHandler> base;
-        public:
-            virtual void notify(Message) noexcept = 0;
-        };
-        class Handler; // unbounded MPSC queue
+        event_d.emit();
+        subscriber.wait();
+        subscriber.reset();
 
-    private:
-        struct EventInterface
-        {
-            std::size_t (*subscribe)(void* event, IHandler* handler);
-            std::size_t (*reset)(void* event) noexcept;
-        };
+        event_b.emit();
+        subscriber.wait();
+        subscriber.reset();
 
-        const EventInterface* interface = nullptr;
-        void* event = nullptr;
+        event_c.emit();
+        subscriber.wait();
+        subscriber.reset();
 
-    public:
-        template<class Event>
-        IEvent(Event& event) noexcept
-        : event(&event)
-        {
-            static const EventInterface implement = {
-                [](void* event, IHandler* handler) {
-                    if (handler) {
-                        class Handler: public BaseHandler, public Event::IHandler
-                        {
-                            IHandler* handler;
-                        public:
-                            explicit Handler(IHandler* handler) noexcept
-                            : handler(handler)
-                            {}
-
-                            void notify(typename Event::Message message) noexcept
-                            {
-                                handler->notify(std::move(message));
-                            }
-                        };
-                        auto base = std::make_unique<Handler>(handler);
-                        auto* next = base.get();
-                        handler->base = std::move(base);
-                        return static_cast<Event*>(event)->subscribe(next);
-                    } else {
-                        return static_cast<Event*>(event)->subscribe(nullptr);
-                    }
-                },
-                [](void* event) noexcept {
-                    return static_cast<Event*>(event)->reset();
-                }
-            };
-            interface = &implement;
-        }
-    public:
-        IEvent(const IEvent&) = default;
-        IEvent(IEvent&&) = default;
-        IEvent& operator=(const IEvent&) = default;
-        IEvent& operator=(IEvent&&) = default;
-    public:
-        std::size_t subscribe(IHandler* handler) noexcept
-        {
-            return interface->subscribe(event, handler);
-        }
-        std::size_t reset() noexcept
-        {
-            return interface->reset(event);
-        }
-    };*/
+        event_d.emit();
+        subscriber.wait();
+        subscriber.reset();
+    }
 }

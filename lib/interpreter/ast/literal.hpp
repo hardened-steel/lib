@@ -4,7 +4,7 @@
 
 namespace lib::interpreter {
     namespace ast {
-        template<class T>
+        template <class T>
         struct Literal: Expression
         {
             T value;
@@ -15,7 +15,7 @@ namespace lib::interpreter {
             constexpr Literal(const Literal& other) = default;
             constexpr Literal& operator=(const Literal& other) = default;
 
-            template<class Context, class ...TArgs>
+            template <class Context, class ...TArgs>
             constexpr auto operator()(Context& ctx, TArgs&& ...args) const
             {
                 return ctx(*this, std::forward<TArgs>(args)...);
@@ -23,14 +23,14 @@ namespace lib::interpreter {
         };
     }
 
-    template<char ...Chars>
+    template <char ...Chars>
     constexpr auto operator ""_l() noexcept
     {
         using Parser = lib::literal::Parser<Chars...>;
         return ast::Literal<typename Parser::Type>(Parser::value);
     }
 
-    template<class T>
+    template <class T>
     constexpr auto literal(const T& value) noexcept
     {
         return ast::Literal<T>(value);

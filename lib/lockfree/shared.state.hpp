@@ -5,7 +5,7 @@
 
 namespace lib::lockfree {
 
-    template<class T>
+    template <class T>
     class SharedState
     {
         std::array<T, 3> states;
@@ -46,7 +46,7 @@ namespace lib::lockfree {
 }
 
 namespace lib {
-    template<class T>
+    template <class T>
     struct TypeName<lockfree::SharedState<T>>
     {
         constexpr static inline StaticString name = "lib::lockfree::SharedState<" + type_name<T> + ">";

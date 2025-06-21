@@ -51,14 +51,14 @@ namespace lib::interpreter::const_expr {
             storage[ptr + 3] = static_cast<std::uint8_t>(value >> 24u);
         }
 
-        template<class T>
+        template <class T>
         constexpr T pop(std::uint32_t& sp, lib::tag_t<T> tag) const
         {
             auto val = load(sp, tag);
             sp += sizeof(T);
             return val;
         }
-        template<class T>
+        template <class T>
         constexpr void push(std::uint32_t& sp, T value)
         {
             save(sp - sizeof(T), value);

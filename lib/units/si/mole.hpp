@@ -17,7 +17,7 @@ namespace lib::units {
     };
     constexpr inline Unit<Mole> mole {};
 
-    template<char ...Chars>
+    template <char ...Chars>
     constexpr auto operator ""_mol() noexcept
     {
         using Parser = literal::Parser<Chars...>;

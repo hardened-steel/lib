@@ -1,22 +1,25 @@
 #pragma once
-#include <variant>
-#include <bitset>
-#include <numeric>
-#include <stdexcept>
+#if false
 #include <lib/event.hpp>
 #include <lib/buffer.hpp>
 #include <lib/overload.hpp>
 #include <lib/raw.storage.hpp>
 
+#include <variant>
+#include <bitset>
+#include <numeric>
+#include <stdexcept>
+
+
 namespace lib {
 
-    template<class Channel>
+    template <class Channel>
     struct AsyncRecv
     {
         Channel& channel;
     };
 
-    template<class Event, class TChannel>
+    template <class Event, class TChannel>
     std::size_t wait(Subscriber<Event>& subscriber, const TChannel& channel) noexcept
     {
         subscriber.reset();
@@ -38,10 +41,10 @@ namespace lib {
         return ready;
     }
 
-    constexpr inline struct IChannel {} ichannel;
-    constexpr inline struct OChannel {} ochannel;
+    constexpr inline struct TIChannel {} ichannel;
+    constexpr inline struct TOChannel {} ochannel;
 
-    template<class Channel>
+    template <class Channel>
     class IChannelBase
     {
     public:
@@ -66,7 +69,7 @@ namespace lib {
         }
     };
 
-    /*template<class T>
+    /*template <class T>
     class VIChannel: public IChannel<VIChannel<T>>
     {
         struct Interface
@@ -84,7 +87,7 @@ namespace lib {
         using Type = T;
         using REvent = IEvent;
     public:
-        template<class Channel>
+        template <class Channel>
         VIChannel(Channel& channel) noexcept
         : channel(&channel)
         , event(channel.revent())
@@ -124,7 +127,7 @@ namespace lib {
         {
             return interface->closed(channel);
         }
-    
+
         IEvent& revent() const noexcept
         {
             return event;
@@ -135,10 +138,10 @@ namespace lib {
         }
     };
 
-    template<class Channel>
+    template <class Channel>
     VIChannel(Channel& channel) -> VIChannel<typename Channel::Type>;*/
 
-    template<class ...Channels>
+    template <class ...Channels>
     class ChannelAny: public IChannelBase<ChannelAny<Channels...>>
     {
     public:
@@ -188,7 +191,7 @@ namespace lib {
         }
 
     private:
-        template<std::size_t ...I>
+        template <std::size_t ...I>
         std::size_t poll(std::index_sequence<I...>) const noexcept
         {
             using Function = bool (*)(const ChannelAny*);
@@ -216,7 +219,7 @@ namespace lib {
             return std::accumulate(sizes.begin(), sizes.end(), 0);
         }
 
-        template<std::size_t ...I>
+        template <std::size_t ...I>
         Type peek(std::index_sequence<I...>)
         {
             using Function = Type (*)(ChannelAny*);
@@ -228,7 +231,7 @@ namespace lib {
             return function[current](this);
         }
 
-        template<std::size_t ...I>
+        template <std::size_t ...I>
         void next(std::index_sequence<I...>)
         {
             using Function = Type (*)(ChannelAny*);
@@ -251,22 +254,22 @@ namespace lib {
             }
         }
 
-        template<std::size_t ...I>
+        template <std::size_t ...I>
         bool closed(std::index_sequence<I...>) const noexcept
         {
             return (std::get<I>(channels).closed() && ...);
         }
 
-        template<std::size_t ...I>
+        template <std::size_t ...I>
         void close(std::index_sequence<I...>) noexcept
         {
             (std::get<I>(channels).close(), ...);
         }
     };
-    template<typename... Channels>
+    template <typename... Channels>
     ChannelAny(Channels&... channels) -> ChannelAny<Channels...>;
 
-    template<class ...Channels>
+    template <class ...Channels>
     class ChannelAll: public IChannelBase<ChannelAll<Channels...>>
     {
     public:
@@ -316,7 +319,7 @@ namespace lib {
         }
 
     private:
-        template<std::size_t ...I>
+        template <std::size_t ...I>
         std::size_t poll(std::index_sequence<I...>) const noexcept
         {
             using Function = bool (*)(const ChannelAll*);
@@ -341,34 +344,34 @@ namespace lib {
             return min;
         }
 
-        template<std::size_t ...I>
+        template <std::size_t ...I>
         Type peek(std::index_sequence<I...>)
         {
             return Type(std::get<I>(channels).peek() ...);
         }
 
-        template<std::size_t ...I>
+        template <std::size_t ...I>
         void next(std::index_sequence<I...>)
         {
             (std::get<I>(channels).next(), ...);
         }
 
-        template<std::size_t ...I>
+        template <std::size_t ...I>
         bool closed(std::index_sequence<I...>) const noexcept
         {
             return (std::get<I>(channels).closed() && ...);
         }
 
-        template<std::size_t ...I>
+        template <std::size_t ...I>
         void close(std::index_sequence<I...>) noexcept
         {
             (std::get<I>(channels).close(), ...);
         }
     };
-    template<typename... Channels>
+    template <typename... Channels>
     ChannelAll(Channels&... channels) -> ChannelAll<Channels...>;
 
-    template<class Channel>
+    template <class Channel>
     class IRange
     {
         friend class Iterator;
@@ -451,17 +454,17 @@ namespace lib {
         IRange& operator=(const IRange& range) = delete;
     };
 
-    template<class Channel>
+    template <class Channel>
     auto irange(Channel& channel)
     {
         return IRange<Channel>(channel);
     }
 
-    template<class Channel>
+    template <class Channel>
     class OChannel
     {
     public:
-        template<class Event, class TChannel>
+        template <class Event, class TChannel>
         static bool swait(Subscriber<Event>& subscriber, const TChannel& channel) noexcept
         {
             subscriber.reset();
@@ -479,7 +482,7 @@ namespace lib {
             return ready;
         }
 
-        template<class T>
+        template <class T>
         void send(T&& value)
         {
             auto& self = *static_cast<Channel*>(this);
@@ -494,7 +497,7 @@ namespace lib {
         }
     };
 
-    template<class T>
+    template <class T>
     class VOChannel: public OChannel<VOChannel<T>>
     {
         struct Interface
@@ -504,15 +507,18 @@ namespace lib {
             bool   (*closed)(const void* channel) noexcept;
             bool   (*spoll) (const void* channel) noexcept;
         };
+
     private:
         const Interface* interface = nullptr;
         void* channel = nullptr;
-        mutable IEvent event;
+        mutable Event event;
+
     public:
         using Type = T;
-        using SEvent = IEvent;
+        using SEvent = Event;
+
     public:
-        template<class Channel>
+        template <class Channel>
         VOChannel(Channel& channel) noexcept
         : channel(&channel)
         , event(channel.sevent())
@@ -552,7 +558,7 @@ namespace lib {
         {
             return interface->closed(channel);
         }
-    
+
         SEvent& sevent() const noexcept
         {
             return event;
@@ -563,15 +569,15 @@ namespace lib {
         }
     };
 
-    template<class Channel>
+    template <class Channel>
     VOChannel(Channel& channel) -> VOChannel<typename Channel::Type>;
 
-    template<class T>
+    template <class T>
     class IOChannel: public IChannel<T>, public OChannel<T>
     {
     };
 
-    template<class T>
+    template <class T>
     class BlackHole: public OChannel<BlackHole<T>>
     {
         mutable NeverEvent event;
@@ -595,6 +601,7 @@ namespace lib {
         }
     };
 
-    template<class T>
+    template <class T>
     const inline BlackHole<T> black_hole {};
 }
+#endif

@@ -1,12 +1,14 @@
 #pragma once
 #include <lib/mutex.hpp>
 
+
 namespace lib {
-    template<class Mutex>
+    template <class Mutex>
     class LockGuard
     {
         Mutex& mutex;
         bool locked = false;
+
     public:
         LockGuard(Mutex& mutex) noexcept
         : mutex(mutex)
@@ -14,6 +16,7 @@ namespace lib {
         {
             mutex.lock();
         }
+
         void lock() noexcept
         {
             if(!locked) {
@@ -21,6 +24,7 @@ namespace lib {
                 locked = true;
             }
         }
+
         void unlock() noexcept
         {
             if(locked) {
@@ -28,6 +32,7 @@ namespace lib {
                 locked = false;
             }
         }
+
         ~LockGuard() noexcept
         {
             if(locked) {

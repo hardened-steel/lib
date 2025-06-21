@@ -17,7 +17,7 @@ namespace lib::units {
     };
     constexpr inline Unit<Mass> kilogram {};
 
-    template<char ...Chars>
+    template <char ...Chars>
     constexpr auto operator ""_kg() noexcept
     {
         using Parser = literal::Parser<Chars...>;

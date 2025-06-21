@@ -17,7 +17,7 @@ namespace lib::units {
     };
     constexpr inline Unit<Temperature> kelvin {};
 
-    template<char ...Chars>
+    template <char ...Chars>
     constexpr auto operator ""_K() noexcept
     {
         using Parser = literal::Parser<Chars...>;

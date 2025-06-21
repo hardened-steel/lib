@@ -17,13 +17,13 @@ namespace lib::units {
     };
     constexpr inline Unit<Pascal> pascal {};
 
-    template<>
+    template <>
     struct Dimension<Pascal::Dimension>
     {
         using Type = Pascal;
     };
 
-    template<char ...Chars>
+    template <char ...Chars>
     constexpr auto operator ""_Pa() noexcept
     {
         using Parser = literal::Parser<Chars...>;

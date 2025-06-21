@@ -16,13 +16,13 @@ namespace lib::units {
     };
     constexpr inline Unit<Newton> newton {};
 
-    template<>
+    template <>
     struct Dimension<Newton::Dimension>
     {
         using Type = Newton;
     };
 
-    template<char ...Chars>
+    template <char ...Chars>
     constexpr auto operator ""_N() noexcept
     {
         using Parser = literal::Parser<Chars...>;

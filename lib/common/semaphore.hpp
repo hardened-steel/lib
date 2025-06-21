@@ -1,24 +1,26 @@
 #pragma once
+#include <lib/lock.guard.hpp>
+#include <lib/condition.variable.hpp>
 #include <cstddef>
 #include <limits>
-#include <mutex>
-#include <condition_variable>
-#include "mutex.hpp"
+
 
 namespace lib {
-    
+
     class Semaphore
     {
-        std::condition_variable_any gcv;
-        std::condition_variable_any tcv;
+        ConditionVariable gcv;
+        ConditionVariable tcv;
         std::mutex mutex;
-        
+
         std::size_t sem;
         std::size_t max;
+
     public:
         Semaphore(std::size_t init = 0, std::size_t max = std::numeric_limits<std::size_t>::max()) noexcept
         : sem(init), max(max)
         {}
+
     public:
         void release() noexcept
         {
@@ -28,6 +30,7 @@ namespace lib {
             locker.unlock();
             gcv.notify_one();
         }
+
         void acquire() noexcept
         {
             lib::LockGuard locker(mutex);
@@ -36,6 +39,7 @@ namespace lib {
             locker.unlock();
             tcv.notify_one();
         }
+
         bool try_acquire() noexcept
         {
             lib::LockGuard locker(mutex);

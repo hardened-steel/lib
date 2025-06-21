@@ -15,16 +15,16 @@ namespace lib::buffer {
     constexpr static inline Last last {};
     constexpr static inline First first {};
 
-    template<class T>
+    template <class T>
     class Fill;
 
-    template<class T>
+    template <class T>
     class Read;
 
-    template<class T>
+    template <class T>
     class View;
-    
-    template<class T>
+
+    template <class T>
     class ViewImpl
     {
     protected:
@@ -42,7 +42,7 @@ namespace lib::buffer {
         constexpr ViewImpl(const ViewImpl& other) noexcept
         : data_(other.data_), size_(other.size_)
         {}
-        template<std::size_t Size>
+        template <std::size_t Size>
         constexpr ViewImpl(T(&value)[Size]) noexcept // NOLINT
         : data_(value), size_(Size)
         {}
@@ -108,23 +108,23 @@ namespace lib::buffer {
         }
     };
 
-    template<class T>
+    template <class T>
     class Owner;
 
-    template<class T>
+    template <class T>
     struct Resource: Resource<const T>
     {
         virtual T* data() noexcept = 0;
     };
 
-    template<class T>
+    template <class T>
     struct Resource<const T>
     {
         [[nodiscard]] virtual const T* data() const noexcept = 0;
         [[nodiscard]] virtual std::size_t size() const noexcept = 0;
     };
 
-    template<class T, class Container>
+    template <class T, class Container>
     struct ContainerResource: Resource<T>
     {
         Container container;
@@ -145,7 +145,7 @@ namespace lib::buffer {
         {}
     };
 
-    template<class T, class Container>
+    template <class T, class Container>
     struct ContainerResource<const T, Container>: Resource<const T>
     {
         Container container;
@@ -162,14 +162,14 @@ namespace lib::buffer {
         {}
     };
 
-    template<class T>
+    template <class T>
     class OwnerImpl: public ViewImpl<T>
     {
-        template<class U>
+        template <class U>
         friend class Owner;
         using Base = ViewImpl<T>;
     protected:
-        
+
         std::shared_ptr<Resource<T>> resource = nullptr;
     public:
         using Type = T;
@@ -177,24 +177,24 @@ namespace lib::buffer {
         constexpr OwnerImpl(T* data, std::size_t size) noexcept
         : Base(data, size)
         {}
-        template<class R>
+        template <class R>
         OwnerImpl(std::shared_ptr<R> resource) noexcept
         : Base(resource->data(), resource->size())
         , resource(std::move(resource))
         {}
 
-        template<class R>
+        template <class R>
         OwnerImpl(std::shared_ptr<R> resource, ViewImpl<T> view) noexcept
         : Base(view)
         , resource(std::move(resource))
         {}
 
-        template<class Container>
+        template <class Container>
         explicit OwnerImpl(Container&& c) // NOLINT
         : OwnerImpl(std::make_shared<ContainerResource<T, std::decay_t<Container>>>(std::forward<Container>(c)))
         {}
 
-        template<std::size_t Size>
+        template <std::size_t Size>
         OwnerImpl(T(&value)[Size]) noexcept // NOLINT
         : Base(value, Size)
         {}
@@ -228,12 +228,12 @@ namespace lib::buffer {
         }
     };
 
-    template<class T>
+    template <class T>
     class View: public ViewImpl<T>
     {
     public:
         using ViewImpl<T>::ViewImpl;
-        template<std::size_t N>
+        template <std::size_t N>
         View(std::array<T, N>& array) noexcept
         : ViewImpl<T>(array.data(), array.size())
         {}
@@ -243,7 +243,7 @@ namespace lib::buffer {
         }
     };
 
-    template<>
+    template <>
     class View<const char>: public ViewImpl<const char>
     {
     public:
@@ -253,33 +253,33 @@ namespace lib::buffer {
         {}
     };
 
-    template<class T>
+    template <class T>
     class View<const T>: public ViewImpl<const T>
     {
     public:
         using ViewImpl<const T>::ViewImpl;
-        template<std::size_t N>
+        template <std::size_t N>
         View(const std::array<T, N>& array) noexcept
         : ViewImpl<const T>(array.data(), array.size())
         {}
     };
 
-    template<class T, std::size_t N>
+    template <class T, std::size_t N>
     View(T (&array)[N]) -> View<T>; // NOLINT
 
-    template<class T, std::size_t N>
+    template <class T, std::size_t N>
     View(const std::array<T, N>& array) -> View<const T>;
 
-    template<class T, std::size_t N>
+    template <class T, std::size_t N>
     View(std::array<T, N>& array) -> View<T>;
 
-    template<std::size_t N>
+    template <std::size_t N>
     View(const char (&array)[N]) -> View<const char>; // NOLINT
 
-    template<class T>
+    template <class T>
     View(T*, std::size_t) -> View<T>;
 
-    template<class T>
+    template <class T>
     class Owner: public OwnerImpl<T>
     {
     public:
@@ -294,7 +294,7 @@ namespace lib::buffer {
         }
     };
 
-    template<>
+    template <>
     class Owner<const char>: public OwnerImpl<const char>
     {
     public:
@@ -302,7 +302,7 @@ namespace lib::buffer {
         constexpr Owner(std::string_view view) noexcept
         : OwnerImpl<const char>(view.data(), view.size())
         {}
-        template<std::size_t Size>
+        template <std::size_t Size>
         Owner(const char(&value)[Size]) noexcept // NOLINT
         : OwnerImpl<const char>(value, Size - 1)
         {}
@@ -315,7 +315,7 @@ namespace lib::buffer {
         }
     };
 
-    template<class T>
+    template <class T>
     class Owner<const T>: public OwnerImpl<const T>
     {
     public:
@@ -329,16 +329,16 @@ namespace lib::buffer {
         }
     };
 
-    template<class T, std::size_t N>
+    template <class T, std::size_t N>
     Owner(T (&array)[N]) -> Owner<T>; // NOLINT
 
-    template<std::size_t N>
+    template <std::size_t N>
     Owner(const char (&array)[N]) -> Owner<std::string_view>; // NOLINT
 
-    template<class T>
+    template <class T>
     Owner(T*, std::size_t) -> Owner<T>;
 
-    template<class Container>
+    template <class Container>
     Owner(Container&&) -> Owner<typename Container::value_type>;
 
     inline auto operator""_bytes(const char* str, std::size_t size) noexcept
@@ -350,7 +350,7 @@ namespace lib::buffer {
         return  ViewImpl<const char>(str, size);
     }
 
-    template<class T>
+    template <class T>
     class Fill
     {
         class Container: public Resource<T>
@@ -374,7 +374,7 @@ namespace lib::buffer {
             {
                 return count;
             }
-            template<class ...TArgs>
+            template <class ...TArgs>
             void put(TArgs&& ...args)
             {
                 new(&array[count++]) T(std::forward<TArgs>(args)...);
@@ -434,14 +434,14 @@ namespace lib::buffer {
         {
             return size() == 0;
         }
-        template<class ...TArgs>
+        template <class ...TArgs>
         void put(TArgs&& ...args)
         {
             container->put(std::forward<TArgs>(args)...);
         }
     };
 
-    template<class T>
+    template <class T>
     class Read
     {
         Owner<T> buffer;

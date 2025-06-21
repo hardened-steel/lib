@@ -47,17 +47,17 @@ namespace lib {
         }
     }
 
-    template<class T>
+    template <class T>
     struct TypeName
     {
         constexpr static inline auto name = details::type_name::get_type_name<T>();
     };
 
-    template<class T>
+    template <class T>
     constexpr inline auto type_name = TypeName<T>::name;
 
     namespace details::type_name {
-        template<auto V>
+        template <auto V>
         struct ValueTag {};
 
         template <auto V>
@@ -66,7 +66,7 @@ namespace lib {
             constexpr std::string_view pretty = lib::type_name<ValueTag<V>>;
             const std::string_view prefix = "ValueTag<";
             const std::string_view suffix = ">";
-            
+
             const auto start = pretty.find(prefix) + prefix.size();
             const auto end = pretty.rfind(suffix);
             const auto size = end - start;
@@ -83,82 +83,82 @@ namespace lib {
         }
     }
 
-    template<auto V>
+    template <auto V>
     struct ValueString
     {
         constexpr static inline auto string = details::type_name::get_value_string<V>();
     };
 
-    template<auto V>
+    template <auto V>
     constexpr inline auto value_string = ValueString<V>::string;
 
-    template<>
+    template <>
     struct TypeName<std::string_view>
     {
         constexpr static inline auto name = "std::string_view";
     };
 
-    template<std::size_t N>
+    template <std::size_t N>
     struct TypeName<StaticString<N>>
     {
         constexpr static inline auto name = "lib::static.string[" + value_string<N> + "]";
     };
 
-    template<class T, std::size_t N>
+    template <class T, std::size_t N>
     struct TypeName<std::array<T, N>>
     {
         constexpr static inline auto name = "std::array<" + type_name<T> + ", " + value_string<N> + ">";
     };
 
-    template<class T>
+    template <class T>
     struct TypeName<Span<T>>
     {
         constexpr static inline auto name = "lib::Span<" + type_name<T> + ">";
     };
 
-    template<>
+    template <>
     struct TypeName<std::uint8_t>
     {
         constexpr static inline StaticString name = "u8";
     };
 
-    template<>
+    template <>
     struct TypeName<std::int8_t>
     {
         constexpr static inline StaticString name = "i8";
     };
 
-    template<>
+    template <>
     struct TypeName<std::uint16_t>
     {
         constexpr static inline StaticString name = "u16";
     };
 
-    template<>
+    template <>
     struct TypeName<std::int16_t>
     {
         constexpr static inline StaticString name = "i16";
     };
 
-    template<>
+    template <>
     struct TypeName<std::uint32_t>
     {
         constexpr static inline StaticString name = "u32";
     };
 
-    template<>
+    template <>
     struct TypeName<std::int32_t>
     {
         constexpr static inline StaticString name = "i32";
     };
 
-    template<>
+    template <>
     struct TypeName<std::uint64_t>
     {
         constexpr static inline StaticString name = "u64";
     };
 
-    template<>
+    template <>
     struct TypeName<std::int64_t>
     {
         constexpr static inline StaticString name = "i64";

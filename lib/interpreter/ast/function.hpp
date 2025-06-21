@@ -18,7 +18,7 @@ namespace lib::interpreter {
             constexpr Parameter(const Parameter& other) = default;
             constexpr Parameter& operator=(const Parameter& other) = default;
 
-            template<class Context, class ...TArgs>
+            template <class Context, class ...TArgs>
             constexpr auto operator()(Context& ctx, TArgs&& ...args) const
             {
                 return ctx(*this, std::forward<TArgs>(args)...);
@@ -33,7 +33,7 @@ namespace lib::interpreter {
             }
         };
 
-        template<class Name, class RType, class Parameters, class Body>
+        template <class Name, class RType, class Parameters, class Body>
         struct Function: Statement
         {
             RType      rtype;
@@ -54,33 +54,33 @@ namespace lib::interpreter {
             constexpr Function(const Function& other) = default;
             constexpr Function& operator=(const Function& other) = default;
 
-            template<class Context, class ...TArgs>
+            template <class Context, class ...TArgs>
             constexpr auto operator()(Context& ctx, TArgs&& ...args) const
             {
                 return ctx(*this, std::forward<TArgs>(args)...);
             }
         };
 
-        template<class Fn>
+        template <class Fn>
         struct FunctorBody: Operator
         {
             Fn functor;
 
-            template<class F>
+            template <class F>
             constexpr explicit FunctorBody(F&& functor) noexcept
             : functor(std::forward<F>(functor))
             {}
             constexpr FunctorBody(const FunctorBody& other) = default;
             constexpr FunctorBody& operator=(const FunctorBody& other) = default;
 
-            template<class Context, class ...TArgs>
+            template <class Context, class ...TArgs>
             constexpr auto operator()(Context& ctx, TArgs&& ...args) const
             {
                 return ctx(*this, std::forward<TArgs>(args)...);
             }
         };
 
-        template<class Name, class RType, class Parameters>
+        template <class Name, class RType, class Parameters>
         struct FunctionPrototype
         {
             RType      rtype;
@@ -99,26 +99,26 @@ namespace lib::interpreter {
             constexpr FunctionPrototype(const FunctionPrototype& other) = default;
             constexpr FunctionPrototype& operator=(const FunctionPrototype& other) = default;
 
-            template<class ...Operators, typename = lib::Require<std::is_base_of_v<Operator, Operators>...>>
+            template <class ...Operators, typename = lib::Require<std::is_base_of_v<Operator, Operators>...>>
             constexpr auto operator()(const Operators& ...operators) const noexcept
             {
                 return Function(rtype, name, params, scope(operators...));
             }
 
-            template<class Functor, typename = lib::Require<!std::is_base_of_v<Operator, Functor>>>
+            template <class Functor, typename = lib::Require<!std::is_base_of_v<Operator, Functor>>>
             constexpr auto operator()(const Functor& function) const noexcept
             {
                 return Function(rtype, name, params, FunctorBody<Functor>(function));
             }
 
-            template<class Context, class ...TArgs>
+            template <class Context, class ...TArgs>
             constexpr auto operator()(Context& ctx, TArgs&& ...args) const
             {
                 return ctx(*this, std::forward<TArgs>(args)...);
             }
         };
 
-        template<class Name, class RType>
+        template <class Name, class RType>
         struct FunctionName
         {
             RType rtype;
@@ -130,7 +130,7 @@ namespace lib::interpreter {
             constexpr FunctionName(const FunctionName& other) = default;
             constexpr FunctionName& operator=(const FunctionName& other) = default;
 
-            template<class ...Params, typename = lib::Require<std::is_same_v<Parameter, Params> ...>>
+            template <class ...Params, typename = lib::Require<std::is_same_v<Parameter, Params> ...>>
             constexpr auto operator()(const Params& ...params) const noexcept
             {
                 using Parameters = std::array<Parameter, sizeof...(Params)>;
@@ -140,52 +140,52 @@ namespace lib::interpreter {
                 );
             }
 
-            template<class Context, class ...TArgs>
+            template <class Context, class ...TArgs>
             constexpr auto operator()(Context& ctx, TArgs&& ...args) const
             {
                 return ctx(*this, std::forward<TArgs>(args)...);
             }
         };
 
-        template<class Name, class Params>
+        template <class Name, class Params>
         struct FunctionCall: Expression
         {
             Name   name;
             Params params;
 
-            template<class T>
+            template <class T>
             constexpr explicit FunctionCall(T&& name, const Params& params) noexcept
             : name(std::forward<T>(name)), params(params)
             {}
             constexpr FunctionCall(const FunctionCall& other) = default;
             constexpr FunctionCall& operator=(const FunctionCall& other) = default;
 
-            template<class Context, class ...TArgs>
+            template <class Context, class ...TArgs>
             constexpr auto operator()(Context& ctx, TArgs&& ...args) const
             {
                 return ctx(*this, std::forward<TArgs>(args)...);
             }
         };
 
-        template<class Name>
+        template <class Name>
         struct GetFunction
         {
             Name name;
 
-            template<class T>
+            template <class T>
             constexpr explicit GetFunction(T&& name) noexcept
             : name(std::forward<T>(name))
             {}
             constexpr GetFunction(const GetFunction& other) = default;
             constexpr GetFunction& operator=(const GetFunction& other) = default;
 
-            template<class ...Params, typename = lib::Require<std::is_base_of_v<Expression, Params>...>>
+            template <class ...Params, typename = lib::Require<std::is_base_of_v<Expression, Params>...>>
             constexpr auto operator()(const Params& ...params) const noexcept
             {
                 return FunctionCall<Name, std::tuple<Params...>>(name, std::make_tuple(params...));
             }
 
-            template<
+            template <
                 class Context, class ...TArgs,
                 typename = lib::Require<!std::is_base_of_v<Expression, Context>, !std::is_base_of_v<Expression, TArgs>...>
             >
@@ -197,7 +197,7 @@ namespace lib::interpreter {
 
         struct FunctionCreator
         {
-            template<class Name, class RType>
+            template <class Name, class RType>
             constexpr auto operator()(const RType& rtype, const Name& name) const noexcept
             {
                 using N = std::conditional_t<std::is_array_v<Name>, lib::StaticString<std::extent_v<Name> - 1>, Name>;
@@ -205,7 +205,7 @@ namespace lib::interpreter {
                 return FunctionName<N, R>(rtype, name);
             }
 
-            template<class Name>
+            template <class Name>
             constexpr auto operator()(const Name& name) const noexcept
             {
                 using N = std::conditional_t<std::is_array_v<Name>, lib::StaticString<std::extent_v<Name> - 1>, Name>;

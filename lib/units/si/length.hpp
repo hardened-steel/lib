@@ -17,7 +17,7 @@ namespace lib::units {
     };
     constexpr inline Unit<Metre> metre {};
 
-    template<char ...Chars>
+    template <char ...Chars>
     constexpr auto operator ""_m() noexcept
     {
         using Parser = literal::Parser<Chars...>;

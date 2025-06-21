@@ -17,7 +17,7 @@ namespace lib::units {
     };
     constexpr inline Unit<ECurrent> ampere {};
 
-    template<char ...Chars>
+    template <char ...Chars>
     constexpr auto operator ""_A() noexcept
     {
         using Parser = literal::Parser<Chars...>;

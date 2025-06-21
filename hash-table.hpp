@@ -4,7 +4,7 @@
 #include <utility>
 #include <vector>
 
-template<class Key, class Value>
+template <class Key, class Value>
 class HashTable
 {
     using Item = std::pair<const Key, Value>;

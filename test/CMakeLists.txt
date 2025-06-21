@@ -1,12 +1,13 @@
 add_executable(${PROJECT_NAME}-test
+    functional-programming.cpp
     units.cpp
     #parser.cpp
     typetraits.cpp
     #interpreter.cpp
-    channel.cpp
-    event.cpp
-    cycle.buffer.cpp
-    coro.cpp
+    #channel.cpp
+    #event.cpp
+    #cycle.buffer.cpp
+    #coro.cpp
 )
 set_target_properties(${PROJECT_NAME}-test
     PROPERTIES

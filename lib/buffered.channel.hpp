@@ -1,4 +1,5 @@
 #pragma once
+#if false
 #include <lib/cycle.buffer.hpp>
 #include <lib/channel.hpp>
 #include <lib/mutex.hpp>
@@ -8,7 +9,7 @@ namespace lib {
     /// @todo Реализовать временный перенос приоритета потоков, т.е. если писатель имеет больший приоритет
     /// чем читатель и ему некуда писать новые данные, то приоритет читателя повышается до приоритета писателя.
     /// Нужно так же исправить класс lib::IRange<Channel>.
-    template<class T, std::size_t N>
+    template <class T, std::size_t N>
     class BufferedChannel: public IOChannel<BufferedChannel<T, N>>
     {
         CycleBuffer<T, N> buffer;
@@ -78,3 +79,4 @@ namespace lib {
         }
     };
 }
+#endif

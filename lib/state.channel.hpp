@@ -1,9 +1,10 @@
 #pragma once
+#if false
 #include <lib/channel.hpp>
 #include <lib/lockfree/shared.state.hpp>
 
 namespace lib {
-    template<class T>
+    template <class T>
     class StateChannel: public IOChannel<T>
     {
         lockfree::SharedState<T> state;
@@ -62,3 +63,4 @@ namespace lib {
         }
     };
 }
+#endif

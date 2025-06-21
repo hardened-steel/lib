@@ -78,22 +78,22 @@ struct Type3
     };
 };
 
-template<class T>
+template <class T>
 struct MakeStruct
 {
     constexpr static inline auto type = lib::concat(std::array{StructBegin}, T::type);
 };
 
-template<Types ...types>
+template <Types ...types>
 struct DecodeTypeF;
 
-template<class T, class Indexes = void>
+template <class T, class Indexes = void>
 struct GetTypeF;
 
-template<Types ...types>
+template <Types ...types>
 using DecodeType = typename DecodeTypeF<types...>::Type;
 
-template<Types ...types>
+template <Types ...types>
 struct DecodeTypeF<U8, types...>
 {
     using Type = std::uint8_t;
@@ -105,7 +105,7 @@ struct DecodeTypeF<U8, types...>
     };
 };
 
-template<Types ...types>
+template <Types ...types>
 struct DecodeTypeF<Ptr, types...>
 {
     using Decode = DecodeTypeF<types...>;
@@ -113,7 +113,7 @@ struct DecodeTypeF<Ptr, types...>
     using Tail = typename Decode::Tail;
 };
 
-template<Types ...types>
+template <Types ...types>
 struct DecodeTypeF<StructBegin, types...>
 {
     using DecodeHead = DecodeTypeF<types...>;
@@ -125,7 +125,7 @@ struct DecodeTypeF<StructBegin, types...>
     using Tail = typename DecodeTail::Tail;
 };
 
-template<Types ...types>
+template <Types ...types>
 struct DecodeTypeF<StructBegin, StructEnd, types...>
 {
     using Type = lib::typetraits::List<>;
@@ -137,7 +137,7 @@ struct DecodeTypeF<StructBegin, StructEnd, types...>
     };
 };
 
-template<class T, class Indexes>
+template <class T, class Indexes>
 struct GetTypeF
 {
     using Decode = GetTypeF<T, std::make_index_sequence<T::type.size()>>;
@@ -145,7 +145,7 @@ struct GetTypeF
     using Tail = typename Decode::Tail;
 };
 
-template<class T, std::size_t ...I>
+template <class T, std::size_t ...I>
 struct GetTypeF<T, std::index_sequence<I...>>
 {
     using Decode = DecodeTypeF<T::type[I]...>;
@@ -153,28 +153,28 @@ struct GetTypeF<T, std::index_sequence<I...>>
     using Tail = typename Decode::Tail;
 };
 
-template<class T>
+template <class T>
 struct ConvertListToTupleF
 {
     using Type = T;
 };
 
-template<class T>
+template <class T>
 using ConvertListToTuple = typename ConvertListToTupleF<T>::Type;
 
-template<class ...Ts>
+template <class ...Ts>
 struct ConvertListToTupleF<lib::typetraits::List<Ts...>>
 {
     using Type = std::tuple<ConvertListToTuple<Ts>...>;
 };
 
-template<class ...Ts>
+template <class ...Ts>
 struct ConvertListToTupleF<lib::typetraits::List<Ts...>*>
 {
     using Type = std::tuple<ConvertListToTuple<Ts>...>*;
 };
 
-template<class T>
+template <class T>
 using GetType = ConvertListToTuple<typename GetTypeF<T>::Type>;
 
 TEST(grammar, test)

@@ -18,13 +18,13 @@ namespace lib::units {
         }
     };
 
-    template<>
+    template <>
     struct Dimension<EResistance::Dimension>
     {
         using Type = EResistance;
     };
 
-    template<char ...Chars>
+    template <char ...Chars>
     constexpr auto operator ""_ohm() noexcept
     {
         using Parser = literal::Parser<Chars...>;

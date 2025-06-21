@@ -1,4 +1,5 @@
 #pragma once
+#if false
 #include <lib/channel.hpp>
 #include <lib/units.hpp>
 #include <lib/units/si/time.hpp>
@@ -6,7 +7,7 @@
 #include <list>
 
 namespace lib {
-    template<class T>
+    template <class T>
     class Task;
 
     class Scheduler;
@@ -19,7 +20,7 @@ namespace lib {
         [[nodiscard]] virtual lib::IEvent& event() const noexcept = 0;
     };
 
-    template<>
+    template <>
     class EventMux<std::list<EventAwaiter*>>
     {
         const std::list<EventAwaiter*>& awaiters;
@@ -57,7 +58,7 @@ namespace lib {
 
     class BasePromise
     {
-        template<class T>
+        template <class T>
         friend class Task;
         friend Scheduler;
 
@@ -87,7 +88,7 @@ namespace lib {
             return FinalAwaiter(scheduler, prev);
         }
 
-        template<class Channel>
+        template <class Channel>
         class ChannelAwaiter: public EventAwaiter
         {
         public:
@@ -126,20 +127,20 @@ namespace lib {
             std::coroutine_handle<> suspended_coro = nullptr;
         };
 
-        template<class Channel>
+        template <class Channel>
         auto await_transform(AsyncRecv<Channel> recv) noexcept
         {
             return ChannelAwaiter<Channel>(scheduler, recv.channel);
         }
 
-        template<typename Awaiter>
+        template <typename Awaiter>
         auto&& await_transform(Awaiter&& awaitable) noexcept
         {
             return std::forward<Awaiter>(awaitable);
         }
     };
 
-    template<class T>
+    template <class T>
     class Promise: public BasePromise
     {
         friend Scheduler;
@@ -151,7 +152,7 @@ namespace lib {
             return Task<T>(std::coroutine_handle<Promise>::from_promise(*this));
         }
 
-        template<class TArg>
+        template <class TArg>
         void return_value(TArg&& arg)
         {
             value.emplace(std::forward<TArg>(arg));
@@ -166,7 +167,7 @@ namespace lib {
         }
     };
 
-    template<class T>
+    template <class T>
     class Task
     {
         friend Scheduler;
@@ -208,7 +209,7 @@ namespace lib {
             {
                 return next.promise().get_value();
             }
-            template<class Promise>
+            template <class Promise>
             auto await_suspend(std::coroutine_handle<Promise> prev) const noexcept
             {
                 auto& next_promise = next.promise();
@@ -235,7 +236,7 @@ namespace lib {
         }
     };
 
-    template<>
+    template <>
     class Promise<void>: public BasePromise
     {
         friend Scheduler;
@@ -292,7 +293,7 @@ namespace lib {
 
         const Task<void> gc = garbage_collector(*this);
     public:
-        template<class T>
+        template <class T>
         void bind(Task<T> task)
         {
             auto coro = task.release();
@@ -322,7 +323,7 @@ namespace lib {
             return std::noop_coroutine();
         }
 
-        template<class T>
+        template <class T>
         void operator += (Task<T> task)
         {
             bind(std::move(task));
@@ -348,7 +349,7 @@ namespace lib {
         {
             Handler handler;
             EventMux<std::list<EventAwaiter*>> blocks(block_list);
-            
+
             while (!ready_tasks.empty() || !block_list.empty()) {
                 if (!ready_tasks.empty()) {
                     auto coro = ready_tasks.front();
@@ -375,7 +376,7 @@ namespace lib {
         return scheduler->next();
     }
 
-    template<class Channel>
+    template <class Channel>
     std::coroutine_handle<> BasePromise::ChannelAwaiter<Channel>::await_suspend(std::coroutine_handle<> coro) noexcept
     {
         this->suspended_coro = coro;
@@ -383,9 +384,10 @@ namespace lib {
         return scheduler->next();
     }
 
-    template<class T, class Ratio>
+    template <class T, class Ratio>
     auto operator co_await(const Quantity<units::Second, T, Ratio>& duration) noexcept
     {
         return std::suspend_never{};
     }
 }
+#endif

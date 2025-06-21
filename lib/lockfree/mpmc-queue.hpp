@@ -5,7 +5,7 @@
 
 namespace lib::lockfree {
 
-    template<class T>
+    template <class T>
     class MPMCQueue
     {
         alignas(std::hardware_destructive_interference_size) std::atomic<std::size_t> enqueue_pos;
@@ -69,7 +69,7 @@ namespace lib::lockfree {
                 }
             }
         }
-        
+
         bool enqueue(T& data)
         {
             const auto buffer_mask = buffer.size() - 1;
@@ -133,7 +133,7 @@ namespace lib::lockfree {
 }
 
 namespace lib {
-    template<class T>
+    template <class T>
     struct TypeName<lockfree::MPMCQueue<T>>
     {
         constexpr static inline StaticString name = "lib::lockfree::MPMCQueue<" + type_name<T> + ">";

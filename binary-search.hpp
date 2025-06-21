@@ -1,7 +1,7 @@
 #include <iterator>
 
 
-template<class Begin, class End, class Value>
+template <class Begin, class End, class Value>
 auto find(Begin begin, End end, const Value& value)
 {
     auto distance = std::distance(begin, end);
@@ -9,7 +9,7 @@ auto find(Begin begin, End end, const Value& value)
     while (distance > 0) {
         auto step = distance / 2;
         auto it = begin + step;
- 
+
         if (*it < value) {
             begin = ++it;
             distance -= step + 1;

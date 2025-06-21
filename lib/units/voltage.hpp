@@ -17,13 +17,13 @@ namespace lib::units {
         }
     };
 
-    template<>
+    template <>
     struct Dimension<Voltage::Dimension>
     {
         using Type = Voltage;
     };
 
-    template<char ...Chars>
+    template <char ...Chars>
     constexpr auto operator ""_V() noexcept
     {
         using Parser = literal::Parser<Chars...>;

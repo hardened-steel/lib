@@ -5,18 +5,18 @@
 namespace lib::typetraits::interpreter {
 
     namespace impl {
-        template<class List, class IContext, template <class Context, class Element> class Action>
+        template <class List, class IContext, template <class Context, class Element> class Action>
         struct ForF;
 
-        template<class List, class IContext, template <class Context, class Element> class Action>
+        template <class List, class IContext, template <class Context, class Element> class Action>
         using For = typename ForF<List, IContext, Action>::Result;
 
-        template<template<class...> class TList, class Head, class ...Tail, class IContext, template <class Context, class Element> class Action>
+        template <template <class...> class TList, class Head, class ...Tail, class IContext, template <class Context, class Element> class Action>
         struct ForF<TList<Head, Tail...>, IContext, Action>
         {
             using ActionResult = Action<IContext, Head>;
 
-            template<class T>
+            template <class T>
             using Next = For<List<Tail...>, T, Action>;
 
             using Result = If<
@@ -26,7 +26,7 @@ namespace lib::typetraits::interpreter {
             >;
         };
 
-        template<template<class...> class TList, class IContext, template <class Context, class Element> class Action>
+        template <template <class...> class TList, class IContext, template <class Context, class Element> class Action>
         struct ForF<TList<>, IContext, Action>
         {
             using Result = IContext;
