@@ -14,6 +14,9 @@ namespace lib::data_structures {
         DLListElement* prev = nullptr;
 
         ~DLListElement() noexcept;
+
+        DLListElement() noexcept = default;
+        DLListElement(DLListElement&& other) = delete;
     };
 
     template <class Tag>

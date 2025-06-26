@@ -31,8 +31,22 @@ namespace lib {
 
     class Test::Check
     {
+        bool failed = false;
+
     public:
+        std::size_t s_count = 0;
+        std::size_t f_count = 0;
+
         void operator () (bool conditional, std::source_location slocation = std::source_location::current());
+        [[nodiscard]] bool test_failed() const noexcept
+        {
+            return failed;
+        }
+
+        void reset() noexcept
+        {
+            failed = false;
+        }
     };
 
     constexpr static inline Test::Case empty_test_case {typetraits::next(), [](Test::Check&){}};
