@@ -10,15 +10,17 @@ namespace lib::fp {
         co_return co_await converter(co_await value);
     }*/
 
-    /*template <class ...IParams, class Middle, class To>
+    template <class ...IParams, class Middle, class To>
     Fn<To(IParams...)> map(Fn<Middle(IParams...)> lhs, Fn<To(Middle)> rhs)
     {
-        return [=] (IParams ...args) -> To {
+        return [=] (IParams ...args) -> Fn<To> {
             co_return co_await rhs(lhs(co_await args...));
         };
     }
 
-    unittest {
+    //using TTT = i(bool, int), o(int, float);
+
+    /*unittest {
         const Fn<std::string(int)> convertor = [](int value) {
             return std::to_string(value);
         };

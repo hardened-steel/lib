@@ -287,8 +287,8 @@ namespace lib::fp {
 
                 void run(IWorker*) noexcept final
                 {
-                    value = function();
                     std::lock_guard lock(mutex);
+                    value = function();
                     emit();
                 }
 
@@ -426,16 +426,22 @@ namespace lib::fp {
             const auto function = test_coro(test_coro());
             check(function(worker) == 43);
         }
-
-        /*unittest {
-            SimpleWorker worker;
-
-            const Fn<int> function = []() -> Fn<int> {
-                co_return 42;
-            };
-            check(function(worker) == 42);
-        }*/
     }
+
+    template <class T>
+    struct FnWrapper
+    {
+        using Type = Fn<T>;
+    };
+
+    template <class T>
+    struct FnWrapper<Fn<T>>
+    {
+        using Type = Fn<T>;
+    };
+
+    template <class T>
+    using Wrapper = typename FnWrapper<T>::Type;
 
 
     template <class R, class ...TArgs>
@@ -444,7 +450,7 @@ namespace lib::fp {
         class IFunction
         {
         public:
-            [[nodiscard]] virtual R run(TArgs...) const = 0;
+            [[nodiscard]] virtual Fn<R> run(Wrapper<TArgs>...) const = 0;
         };
 
         std::shared_ptr<IFunction> ifunction;
@@ -468,9 +474,9 @@ namespace lib::fp {
                 : function(std::forward<Function>(function))
                 {}
 
-                [[nodiscard]] R run(TArgs... args) const final
+                [[nodiscard]] Fn<R> run(Wrapper<TArgs>... args) const final
                 {
-                    return function(args...);
+                    co_return co_await function(co_await args...);
                 }
             };
 
@@ -481,9 +487,9 @@ namespace lib::fp {
         template <std::size_t ...I, class ...IArgs>
         [[nodiscard]] auto currying(std::index_sequence<I...>, IArgs ...cargs) const
         {
-            Fn<R(std::tuple_element_t<I, std::tuple<TArgs...>>...)> function = [=, ifunction = this->ifunction]
-            (std::tuple_element_t<I, std::tuple<TArgs...>>... iargs) {
-                return ifunction->run(cargs..., iargs...);
+            using Function = Fn<R(std::tuple_element_t<I, std::tuple<TArgs...>>...)>;
+            Function function = [=, ifunction = this->ifunction] (std::tuple_element_t<I, std::tuple<TArgs...>>... iargs) -> Fn<R> {
+                co_return co_await ifunction->run(cargs..., iargs...);
             };
             return function;
         }
@@ -497,7 +503,7 @@ namespace lib::fp {
             static_assert(iparams <= fparams);
 
             if constexpr (iparams == fparams) {
-                return currying(std::index_sequence<>{}, args...);
+                return ifunction->run(args...);
             } else {
                 return currying(indexes::range<fparams - 1U, fparams - iparams>(), args...);
             }
@@ -510,6 +516,20 @@ namespace lib::fp {
         Fn<int(int, int)> sum = [] (int lhs, int rhs) noexcept {
             return lhs + rhs;
         };
+        check(sum(1, 2)(worker) == 3);
+        check(sum(3)(2)(worker) == 5);
+    }
+
+    unittest {
+        SimpleWorker worker;
+
+        const auto sum_coro = [](Fn<int> lhs, Fn<int> rhs) -> Fn<int> {
+            const auto l = co_await lhs;
+            const auto r = co_await rhs;
+            co_return l + r;
+        };
+
+        Fn<int(int, int)> sum = sum_coro;
         check(sum(1, 2)(worker) == 3);
         check(sum(3)(2)(worker) == 5);
     }
