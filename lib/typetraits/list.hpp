@@ -27,6 +27,23 @@ namespace lib::typetraits {
     using Head = impl::Head<List>;
 
     namespace impl {
+        template <class List>
+        struct TailF;
+
+        template <class List>
+        using Tail = typename TailF<List>::Result;
+
+        template <class Head, class ...Ts>
+        struct TailF<List<Head, Ts...>>
+        {
+            using Result = List<Ts...>;
+        };
+    }
+
+    template <class List>
+    using Tail = impl::Tail<List>;
+
+    namespace impl {
         template <class List, class T>
         struct InsertBackF;
 

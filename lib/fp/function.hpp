@@ -1,6 +1,8 @@
 #pragma once
 #include <lib/test.hpp>
 #include <lib/mutex.hpp>
+#include <lib/typetraits/tag.hpp>
+#include <lib/typetraits/list.hpp>
 #include <lib/data-structures/dl-list.hpp>
 #include <lib/index.sequence.hpp>
 
@@ -251,7 +253,7 @@ namespace lib::fp {
         Fn& operator=(Fn&& other) noexcept = default;
 
         template <class Function>
-        requires (!std::is_same_v<std::remove_cvref_t<Function>, Fn>)
+        requires (!(std::is_same_v<std::remove_cvref_t<Function>, Fn<T()>> || std::is_same_v<std::remove_cvref_t<Function>, Fn<T>>))
         Fn(Function&& function)
         {
             class Impl: public IResult, public IWorker::ITask
@@ -367,6 +369,11 @@ namespace lib::fp {
             return result->get();
         }
 
+        Fn<T()> operator()() const noexcept
+        {
+            return *this;
+        }
+
         [[nodiscard]] bool ready() const noexcept
         {
             return result->ready();
@@ -391,7 +398,7 @@ namespace lib::fp {
     };
 
     template <class T>
-    Fn(T value) ->Fn<T>;
+    Fn(T value) ->Fn<T()>;
 
     unittest {
         SimpleWorker worker;
@@ -431,18 +438,117 @@ namespace lib::fp {
     template <class T>
     struct FnWrapper
     {
-        using Type = Fn<T>;
+        using Type = Fn<T()>;
     };
 
-    template <class T>
-    struct FnWrapper<Fn<T>>
+    template <class R, class ...TArgs>
+    struct FnWrapper<Fn<R(TArgs...)>>
     {
-        using Type = Fn<T>;
+        using Type = Fn<R(TArgs...)>;
     };
 
     template <class T>
     using Wrapper = typename FnWrapper<T>::Type;
 
+    template <class T>
+    Fn<T()> wrap(T value)
+    {
+        return value;
+    }
+
+    template <class R, class ...TArgs>
+    Fn<R(TArgs...)> wrap(Fn<R(TArgs...)> fn) noexcept
+    {
+        return fn;
+    }
+
+    namespace details {
+        template <std::size_t Offset, class List>
+        struct AddOffsetF;
+
+        template <std::size_t Offset>
+        struct AddOffsetF<Offset, typetraits::List<>>
+        {
+            using Result = typetraits::List<>;
+        };
+
+        template <std::size_t Offset, class Head, class ...Tail>
+        struct AddOffsetF<Offset, typetraits::List<Head, Tail...>>
+        {
+            using Result = typetraits::Concat<
+                typetraits::List<indexes::Add<Offset, Head>>,
+                typename AddOffsetF<Offset, typetraits::List<Tail...>>::Result
+            >;
+        };
+
+        template <std::size_t Offset, class List>
+        using AddOffset = typename AddOffsetF<Offset, List>::Result;
+
+        template <class TArgs, class ...IArgs>
+        struct CarryingF;
+
+        template <class TArgs>
+        struct CarryingF<TArgs>
+        {
+            using IArgs = typetraits::List<>;
+            using CIndx = typetraits::List<>;
+            using OArgs = TArgs;
+        };
+
+        template<class Head, class ...Tail, class R, class ...TArgs, class ...Params>
+        struct CarryingF<typetraits::List<Head, Tail...>, Fn<R(TArgs...)>, Params...>
+        {
+            using IArgs = typetraits::Concat<typetraits::List<TArgs...>, typename CarryingF<typetraits::List<Tail...>, Params...>::IArgs>;
+            using CIndx = typetraits::Concat<
+                typetraits::List<std::index_sequence_for<TArgs...>>,
+                AddOffset<sizeof...(TArgs), typename CarryingF<typetraits::List<Tail...>, Params...>::CIndx>
+            >;
+            using OArgs = typename CarryingF<typetraits::List<Tail...>, Params...>::OArgs;
+        };
+
+        template<class ...Tail, class R, class ...TArgs, class ...Params>
+        struct CarryingF<typetraits::List<Fn<R(TArgs...)>, Tail...>, Fn<R(TArgs...)>, Params...>
+        {
+            using IArgs = typename CarryingF<typetraits::List<Tail...>, Params...>::IArgs;
+            using CIndx = typetraits::Concat<
+                typetraits::List<std::index_sequence_for<>>,
+                typename CarryingF<typetraits::List<Tail...>, Params...>::CIndx
+            >;
+            using OArgs = typename CarryingF<typetraits::List<Tail...>, Params...>::OArgs;
+        };
+
+        template <class TArgs, class ...IArgs>
+        using CarryingIArgs = typename CarryingF<TArgs, IArgs...>::IArgs;
+
+        static_assert(std::is_same_v<CarryingIArgs<typetraits::List<int, float, double>, Fn<int(int, float)>>, typetraits::List<int, float>>);
+        static_assert(std::is_same_v<CarryingIArgs<typetraits::List<int, float, double>, Fn<int(int, float)>, Fn<void(double)>>, typetraits::List<int, float, double>>);
+        static_assert(std::is_same_v<CarryingIArgs<typetraits::List<int, float, int, double>, Fn<int(int, float)>, Fn<int()>, Fn<void(double)>>, typetraits::List<int, float, double>>);
+        static_assert(std::is_same_v<CarryingIArgs<typetraits::List<int, int, float, int, double>, Fn<int()>, Fn<int(int, float)>, Fn<int()>, Fn<void(double)>>, typetraits::List<int, float, double>>);
+        static_assert(std::is_same_v<CarryingIArgs<typetraits::List<Fn<double(int)>, float>, Fn<double(int)>>, typetraits::List<>>);
+
+
+        template <class TArgs, class ...IArgs>
+        using CarryingCIndx = typename CarryingF<TArgs, IArgs...>::CIndx;
+
+        static_assert(std::is_same_v<CarryingCIndx<typetraits::List<int, float, double>, Fn<int(int, float)>>, typetraits::List<std::index_sequence<0, 1>>>);
+        static_assert(std::is_same_v<CarryingCIndx<typetraits::List<int, float, double>, Fn<int(int, float)>, Fn<void(double)>>, typetraits::List<std::index_sequence<0, 1>, std::index_sequence<2>>>);
+        static_assert(std::is_same_v<CarryingCIndx<typetraits::List<int, float, int, double>, Fn<int(int, float)>, Fn<int()>, Fn<void(double)>>, typetraits::List<std::index_sequence<0, 1>, std::index_sequence<>, std::index_sequence<2>>>);
+
+        template <class TArgs, class ...IArgs>
+        using CarryingOArgs = typename CarryingF<TArgs, IArgs...>::OArgs;
+
+        static_assert(std::is_same_v<CarryingOArgs<typetraits::List<int, float, double>, Fn<int(int, float)>>, typetraits::List<float, double>>);
+        static_assert(std::is_same_v<CarryingOArgs<typetraits::List<int, float, double>, Fn<int(int, float)>, Fn<float(double)>>, typetraits::List<double>>);
+        static_assert(std::is_same_v<CarryingOArgs<typetraits::List<int, float, int, double>, Fn<int(int, float)>, Fn<int()>, Fn<void(double)>, Fn<double()>>, typetraits::List<>>);
+        static_assert(std::is_same_v<CarryingOArgs<typetraits::List<Fn<double(int)>, Fn<float(int)>>, Fn<double(int)>>, typetraits::List<Fn<float(int)>>>);
+
+
+        template <class R, class ...TArgs, class Tuple, std::size_t ...I>
+        decltype(auto) apply(const Fn<R(TArgs...)>& function, const Tuple& params, std::index_sequence<I...>)
+        {
+            return function(std::get<I>(params)...);
+        }
+    }
 
     template <class R, class ...TArgs>
     class Fn<R(TArgs...)>
@@ -450,7 +556,7 @@ namespace lib::fp {
         class IFunction
         {
         public:
-            [[nodiscard]] virtual Fn<R> run(Wrapper<TArgs>...) const = 0;
+            [[nodiscard]] virtual Fn<R()> run(Wrapper<TArgs>...) const = 0;
         };
 
         std::shared_ptr<IFunction> ifunction;
@@ -474,39 +580,53 @@ namespace lib::fp {
                 : function(std::forward<Function>(function))
                 {}
 
-                [[nodiscard]] Fn<R> run(Wrapper<TArgs>... args) const final
+                [[nodiscard]] Fn<R()> run(Wrapper<TArgs>... args) const final
                 {
                     co_return co_await function(co_await args...);
                 }
             };
 
-            ifunction = std::make_shared<Impl>(std::forward<Function>(function));
+            auto nfunction = std::make_shared<Impl>(std::forward<Function>(function));
+            ifunction = nfunction;
         }
 
     private:
-        template <std::size_t ...I, class ...IArgs>
-        [[nodiscard]] auto currying(std::index_sequence<I...>, IArgs ...cargs) const
+        template <class ...IArgs, class ...OArgs, class ...CIndx, class ...Args>
+        [[nodiscard]] auto currying(typetraits::TTag<typetraits::List<IArgs...>>, typetraits::TTag<typetraits::List<OArgs...>>, typetraits::TTag<typetraits::List<CIndx...>>, Args ...cargs) const
         {
-            using Function = Fn<R(std::tuple_element_t<I, std::tuple<TArgs...>>...)>;
-            Function function = [=, ifunction = this->ifunction] (std::tuple_element_t<I, std::tuple<TArgs...>>... iargs) -> Fn<R> {
-                co_return co_await ifunction->run(cargs..., iargs...);
+            auto function = [cargs..., ifunction = this->ifunction](IArgs ...iargs, OArgs ...oargs) -> Fn<R()> {
+                const auto iargs_list = std::tie(iargs...);
+                auto result = co_await ifunction->run(details::apply(cargs, iargs_list, CIndx{})..., oargs...);
+                co_return result;
             };
-            return function;
+            return Fn<R(IArgs..., OArgs...)>(std::move(function));
+        }
+
+        template <class ...Args>
+        [[nodiscard]] auto currying(Args ...args) const
+        {
+            using IArgs = details::CarryingIArgs<typetraits::List<TArgs...>, Args...>;
+            using OArgs = details::CarryingOArgs<typetraits::List<TArgs...>, Args...>;
+            using CIndx = details::CarryingCIndx<typetraits::List<TArgs...>, Args...>;
+
+            if constexpr (std::is_same_v<typetraits::Concat<IArgs, OArgs>, typetraits::List<>>) {
+                return ifunction->run(args...);
+            } else {
+                return currying(typetraits::tag_t<IArgs>, typetraits::tag_t<OArgs>, typetraits::tag_t<CIndx>, args...);
+            }
         }
 
     public:
         template <class ...IArgs>
         auto operator()(IArgs ...args) const
         {
-            constexpr auto fparams = sizeof...(TArgs);
-            constexpr auto iparams = sizeof...(IArgs);
-            static_assert(iparams <= fparams);
+            static_assert(sizeof...(IArgs) <= sizeof...(TArgs));
+            return currying(wrap(args)...);
+        }
 
-            if constexpr (iparams == fparams) {
-                return ifunction->run(args...);
-            } else {
-                return currying(indexes::range<fparams - 1U, fparams - iparams>(), args...);
-            }
+        Fn<R(TArgs...)> operator()() const noexcept
+        {
+            return *this;
         }
     };
 

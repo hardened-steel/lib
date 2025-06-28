@@ -14,8 +14,23 @@ namespace lib::indexes {
     {
         return std::index_sequence<(Is + V)...>{};
     }
-
+    
     static_assert(std::is_same_v<decltype(add<1>(std::index_sequence<0, 1, 2>())), std::index_sequence<1, 2, 3>>);
+
+    template <std::size_t V, class Indexes>
+    struct AddF;
+
+    template <std::size_t V, std::size_t ...Is>
+    struct AddF<V, std::index_sequence<Is...>>
+    {
+        using Result = std::index_sequence<V + Is...>;
+    };
+
+    template <std::size_t V, class Indexes>
+    using Add = typename AddF<V, Indexes>::Result;
+
+    static_assert(std::is_same_v<Add<1, std::index_sequence<0, 1, 2>>, std::index_sequence<1, 2, 3>>);
+    static_assert(std::is_same_v<Add<5, std::index_sequence<0, 1, 2>>, std::index_sequence<5, 6, 7>>);
 
     template <std::size_t V, std::size_t ...Is>
     constexpr auto neg(std::index_sequence<Is...>) noexcept
@@ -24,6 +39,21 @@ namespace lib::indexes {
     }
 
     static_assert(std::is_same_v<decltype(neg<3>(std::index_sequence<3, 2, 1>())), std::index_sequence<0, 1, 2>>);
+
+    template <std::size_t V, class Indexes>
+    struct NegF;
+
+    template <std::size_t V, std::size_t ...Is>
+    struct NegF<V, std::index_sequence<Is...>>
+    {
+        using Result = std::index_sequence<V - Is...>;
+    };
+
+    template <std::size_t V, class Indexes>
+    using Neg = typename NegF<V, Indexes>::Result;
+
+    static_assert(std::is_same_v<Neg<3, std::index_sequence<0, 1, 2>>, std::index_sequence<3, 2, 1>>);
+    static_assert(std::is_same_v<Neg<5, std::index_sequence<0, 1, 2>>, std::index_sequence<5, 4, 3>>);
 
     template <std::size_t NF, std::size_t NL>
     constexpr auto range() noexcept
