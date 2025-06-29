@@ -60,6 +60,9 @@ namespace lib::fp {
     class Fn;
 
     template <class T>
+    using Val = Fn<T()>;
+
+    template <class T>
     class Fn<T()>
     {
         class IResult
@@ -161,9 +164,9 @@ namespace lib::fp {
             }
 
         public:
-            [[nodiscard]] Fn<T> get_return_object() const noexcept
+            [[nodiscard]] Val<T> get_return_object() const noexcept
             {
-                return Fn<T>(typetraits::tag_t<IResult>, result);
+                return Val<T>(typetraits::tag_t<IResult>, result);
             }
 
             auto initial_suspend() const noexcept // NOLINT
@@ -253,7 +256,7 @@ namespace lib::fp {
         Fn& operator=(Fn&& other) noexcept = default;
 
         template <class Function>
-        requires (!(std::is_same_v<std::remove_cvref_t<Function>, Fn<T()>> || std::is_same_v<std::remove_cvref_t<Function>, Fn<T>>))
+        requires (!std::is_same_v<std::remove_cvref_t<Function>, Fn<T()>> && !std::is_same_v<std::remove_cvref_t<Function>, Fn<T>> && std::is_invocable_v<Function>)
         Fn(Function&& function)
         {
             class Impl: public IResult, public IWorker::ITask
@@ -391,26 +394,19 @@ namespace lib::fp {
     };
 
     template <class T>
-    class Fn: public Fn<T()>
-    {
-    public:
-        using Fn<T()>::Fn;
-    };
-
-    template <class T>
     Fn(T value) ->Fn<T()>;
 
     unittest {
         SimpleWorker worker;
 
-        Fn<int> function = [] { return 42; };
+        Val<int> function = [] { return 42; };
         check(function(worker) == 42);
         function = 13;
         check(function(worker) == 13);
     };
 
     namespace details {
-        inline Fn<int> test_coro()
+        inline Val<int> test_coro()
         {
             co_return 42;
         }
@@ -422,7 +418,7 @@ namespace lib::fp {
             check(function(worker) == 42);
         }
 
-        inline Fn<int> test_coro(Fn<int> param)
+        inline Val<int> test_coro(Val<int> param)
         {
             co_return co_await param + co_await 1;
         }
@@ -451,7 +447,7 @@ namespace lib::fp {
     using Wrapper = typename FnWrapper<T>::Type;
 
     template <class T>
-    Fn<T()> wrap(T value)
+    Val<T> wrap(T value)
     {
         return value;
     }
@@ -580,7 +576,7 @@ namespace lib::fp {
                 : function(std::forward<Function>(function))
                 {}
 
-                [[nodiscard]] Fn<R()> run(Wrapper<TArgs>... args) const final
+                [[nodiscard]] Val<R> run(Wrapper<TArgs>... args) const final
                 {
                     co_return co_await function(co_await args...);
                 }
@@ -594,7 +590,7 @@ namespace lib::fp {
         template <class ...IArgs, class ...OArgs, class ...CIndx, class ...Args>
         [[nodiscard]] auto currying(typetraits::TTag<typetraits::List<IArgs...>>, typetraits::TTag<typetraits::List<OArgs...>>, typetraits::TTag<typetraits::List<CIndx...>>, Args ...cargs) const
         {
-            auto function = [cargs..., ifunction = this->ifunction](IArgs ...iargs, OArgs ...oargs) -> Fn<R()> {
+            auto function = [cargs..., ifunction = this->ifunction](IArgs ...iargs, OArgs ...oargs) -> Val<R> {
                 const auto iargs_list = std::tie(iargs...);
                 auto result = co_await ifunction->run(details::apply(cargs, iargs_list, CIndx{})..., oargs...);
                 co_return result;
@@ -643,7 +639,7 @@ namespace lib::fp {
     unittest {
         SimpleWorker worker;
 
-        const auto sum_coro = [](Fn<int> lhs, Fn<int> rhs) -> Fn<int> {
+        const auto sum_coro = [](Val<int> lhs, Val<int> rhs) -> Val<int> {
             const auto l = co_await lhs;
             const auto r = co_await rhs;
             co_return l + r;

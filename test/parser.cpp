@@ -387,7 +387,7 @@ TEST(parser, extended2)
 }
 
 /*template <>
-struct converter<unsigned>
+struct convertor<unsigned>
 {
 	unsigned load(const number_range& range)
 	{
