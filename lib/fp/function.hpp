@@ -1,5 +1,6 @@
 #pragma once
 #include <lib/test.hpp>
+#include <lib/tuple.hpp>
 #include <lib/mutex.hpp>
 #include <lib/typetraits/tag.hpp>
 #include <lib/typetraits/list.hpp>
@@ -15,21 +16,22 @@
 
 namespace lib::fp {
 
-    class IWorker
+    class IExecutor
     {
     public:
         class ITask
         {
         public:
-            virtual void run(IWorker* worker) noexcept = 0;
+            virtual void run(IExecutor* executor) noexcept = 0;
         };
 
     public:
         virtual void add(ITask* task) noexcept = 0;
+        virtual void run() noexcept = 0;
         virtual ITask* get() noexcept = 0;
     };
 
-    class SimpleWorker: public IWorker
+    class SimpleExecutor: public IExecutor
     {
         std::vector<ITask*> tasks;
 
@@ -48,6 +50,13 @@ namespace lib::fp {
             tasks.pop_back();
             return task;
         }
+
+        void run() noexcept final
+        {
+            while (auto* task = get()) {
+                task->run(this);
+            }
+        }
     };
 
     class IAwaiter: public data_structures::DLListElement<>
@@ -56,117 +65,376 @@ namespace lib::fp {
         virtual void wakeup() noexcept = 0;
     };
 
+    struct I;
+    struct O;
+
+    template <class Direction, class T>
+    struct TypeToParamsF
+    {
+        using Result = Direction(T);
+    };
+
+    template <class Direction, class ...Ts>
+    struct TypeToParamsF<Direction, std::tuple<Ts...>>
+    {
+        using Result = Direction(Ts...);
+    };
+
+    template <class Direction, class T>
+    using TypeToParams = typename TypeToParamsF<Direction, T>::Result;
+
+
+    struct Dynamic;
+
+    template <class ...Ts>
+    struct ImplValue;
+
     template <class T>
+    struct TypeToImplValueF
+    {
+        using Result = ImplValue<T>;
+    };
+
+    template <class ...Ts>
+    struct TypeToImplValueF<std::tuple<Ts...>>
+    {
+        using Result = ImplValue<Ts...>;
+    };
+
+    template <class T>
+    using TypeToImplValue = typename TypeToImplValueF<T>::Result;
+
+    template <class F>
+    struct ImplFCall;
+
+    template <class I, class O, class Impl = Dynamic>
     class Fn;
 
     template <class T>
-    using Val = Fn<T()>;
+    struct IsFunctionF
+    {
+        constexpr static inline bool value = false;
+    };
+
+    template <class I, class O, class Impl>
+    struct IsFunctionF<Fn<I, O, Impl>>
+    {
+        constexpr static inline bool value = true;
+    };
 
     template <class T>
-    class Fn<T()>
-    {
-        class IResult
-        {
-        public:
-            [[nodiscard]] virtual bool ready() const noexcept = 0;
-            [[nodiscard]] virtual const T& get() const noexcept = 0;
-            virtual void subscribe(IWorker& worker, IAwaiter& awaiter) = 0;
-        };
+    constexpr bool is_function = IsFunctionF<T>::value;
 
-        std::shared_ptr<IResult> result;
+
+    template <class ...Ts>
+    using Val = Fn<I(), O(Ts...), Dynamic>;
+
+    template <class ...Ts>
+    class Fn<I(), O(Ts...), ImplValue<Ts...>>
+    {
+        static_assert(sizeof...(Ts) > 0);
+
+    public: // type interface
+        using IType = std::tuple<>;
+        using OType = std::tuple<Ts...>;
 
     private:
-        explicit Fn(typetraits::TTag<IResult>, std::shared_ptr<IResult> result) noexcept
-        : result(std::move(result))
+        OType value;
+
+    public: // object interface
+        template <class ...TArgs>
+        requires std::constructible_from<OType, TArgs&&...>
+        Fn(TArgs&& ...args) noexcept(std::is_nothrow_constructible_v<OType, TArgs&&...>)
+        : value(std::forward<TArgs>(args)...)
         {}
 
-    public:
-        class Promise: public IWorker::ITask, public IAwaiter
-        {
-            using Handle = std::coroutine_handle<Promise>;
+        Fn(OType&& value) noexcept(std::is_nothrow_move_constructible_v<OType>)
+        : value(std::move(value))
+        {}
 
-            class Result: public IResult
+        Fn(const OType& value) noexcept(std::is_nothrow_copy_constructible_v<OType>)
+        : value(value)
+        {}
+
+        Fn() = delete;
+        Fn(const Fn& other) = default;
+        Fn(Fn&& other) = default;
+        Fn& operator=(const Fn& other) = default;
+        Fn& operator=(Fn&& other) = default;
+
+    public: // currying interface
+        const Fn& operator () (const IType&) const noexcept
+        {
+            return *this;
+        }
+
+        const Fn& operator () () const noexcept
+        {
+            return *this;
+        }
+
+    public: // runtime interface
+        const auto& operator()([[maybe_unused]] IExecutor& executor) const noexcept
+        {
+            if constexpr (sizeof...(Ts) == 1) {
+                return std::get<0>(value);
+            } else {
+                return value;
+            }
+        }
+
+        [[nodiscard]] bool ready() const noexcept
+        {
+            return true;
+        }
+
+        [[nodiscard]] const OType& get() const noexcept
+        {
+            return value;
+        }
+
+        void subscribe([[maybe_unused]] IExecutor& executor, IAwaiter& awaiter)
+        {
+            awaiter.wakeup();
+        }
+    };
+
+    template <class T>
+    requires (!std::is_invocable_v<std::remove_cvref_t<T>>)
+    Fn(T&& value) -> Fn<I(), TypeToParams<O, std::remove_cvref_t<T>>, TypeToImplValue<std::remove_cvref_t<T>>>;
+
+
+    namespace details {
+        template <class T>
+        class Result
+        {
+            std::optional<T> result;
+            std::exception_ptr exception = nullptr;
+
+            mutable data_structures::DLList subscribers;
+            mutable Mutex mutex;
+
+        private:
+            void emit() const noexcept
+            {
+                for (auto& subscriber: subscribers.Range<IAwaiter>()) {
+                    subscriber.wakeup();
+                }
+            }
+
+            virtual void add_task(IExecutor& executor) noexcept = 0;
+
+        public:
+            template <class U>
+            void set(U&& value) noexcept
+            {
+                std::lock_guard lock(mutex);
+                result.emplace(std::forward<U>(value));
+                emit();
+            }
+
+            void set(typetraits::TTag<std::exception_ptr>, const std::exception_ptr& error) noexcept
+            {
+                exception = error;
+                emit();
+            }
+
+            [[nodiscard]] bool ready() const noexcept
+            {
+                return exception != nullptr || result.has_value();
+            }
+
+            [[nodiscard]] const T& get() const noexcept
+            {
+                if (exception) {
+                    rethrow_exception(exception);
+                }
+                return *result;
+            }
+
+            void subscribe(IExecutor& executor, IAwaiter& awaiter)
+            {
+                std::unique_lock lock(mutex);
+
+                if (ready()) {
+                    awaiter.wakeup();
+                } else {
+                    subscribers.PushBack(awaiter);
+                    lock.unlock();
+                    add_task(executor);
+                }
+            }
+
+            const T& execute(IExecutor& executor)
+            {
+                class Awaiter: public IAwaiter
+                {
+                    mutable std::binary_semaphore sem {0};
+
+                public:
+                    void wakeup() noexcept final
+                    {
+                        sem.release();
+                    }
+
+                    void wait() noexcept
+                    {
+                        sem.acquire();
+                    }
+                };
+
+                Awaiter awaiter;
+                subscribe(executor, awaiter);
+                executor.run();
+                awaiter.wait();
+                return get();
+            }
+        };
+    }
+
+    template <class ...Ts, class Function>
+    class Fn<I(), O(Ts...), ImplFCall<Function>>
+    {
+        static_assert(sizeof...(Ts) > 0);
+
+    public: // type interface
+        using IType = std::tuple<>;
+        using OType = std::tuple<Ts...>;
+
+    public:
+        class FunctionResult: public details::Result<OType>, private IExecutor::ITask
+        {
+            Function function;
+
+        public:
+            FunctionResult(Function&& function) noexcept(std::is_nothrow_move_constructible_v<Function>)
+            : function(std::move(function))
+            {}
+
+            FunctionResult(const Function& function) noexcept(std::is_nothrow_copy_constructible_v<Function>)
+            : function(function)
+            {}
+
+        private:
+            void add_task(IExecutor& executor) noexcept final
+            {
+                executor.add(this);
+            }
+
+            void run([[maybe_unused]] IExecutor* executor) noexcept final
+            try {
+                details::Result<OType>::set(std::make_tuple(function()));
+            } catch (...) {
+                details::Result<OType>::set(typetraits::tag_t<std::exception_ptr>, std::current_exception());
+            }
+        };
+
+    private:
+        std::shared_ptr<FunctionResult> result;
+
+    public: // object interface
+        Fn(Function&& function)
+        : result(std::make_shared<FunctionResult>(std::move(function)))
+        {}
+
+        Fn(const Function& function)
+        : result(std::make_shared<FunctionResult>(function))
+        {}
+
+        Fn() = delete;
+        Fn(const Fn& other) = default;
+        Fn(Fn&& other) = default;
+        Fn& operator=(const Fn& other) = default;
+        Fn& operator=(Fn&& other) = default;
+
+    public: // currying interface
+        const Fn& operator () (const IType&) const noexcept
+        {
+            return *this;
+        }
+
+        const Fn& operator () () const noexcept
+        {
+            return *this;
+        }
+
+    public: // runtime interface
+        const auto& operator()(IExecutor& executor) const noexcept
+        {
+            const auto& value = result->execute(executor);
+            if constexpr (sizeof...(Ts) == 1) {
+                return std::get<0>(value);
+            } else {
+                return value;
+            }
+        }
+
+        [[nodiscard]] bool ready() const noexcept
+        {
+            return result->ready();
+        }
+
+        [[nodiscard]] const OType& get() const noexcept
+        {
+            return result->get();
+        }
+
+        void subscribe(IExecutor& executor, IAwaiter& awaiter)
+        {
+            result->subscribe(executor, awaiter);
+        }
+    };
+
+    template <class Function>
+    requires std::is_invocable_v<std::remove_cvref_t<Function>>
+    Fn(Function&& function) -> Fn<I(), TypeToParams<O, std::invoke_result_t<std::remove_cvref_t<Function>>>, ImplFCall<std::remove_cvref_t<Function>>>;
+
+
+    namespace details {
+        template <class T>
+        class Promise;
+
+        template <class ...Ts>
+        class Promise<std::tuple<Ts...>>: private IAwaiter, private IExecutor::ITask
+        {
+        public:
+            using Type = std::tuple<Ts...>;
+            using Handle = std::coroutine_handle<Promise>;
+            class CoroResult: public Result<Type>
             {
                 Promise* promise;
-                std::optional<T> result;
-                std::exception_ptr exception = nullptr;
-
-                mutable data_structures::DLList subscribers;
-                mutable Mutex mutex;
-
-            private:
-                void emit() const noexcept
-                {
-                    for (auto& subscriber: subscribers.Range<IAwaiter>()) {
-                        subscriber.wakeup();
-                    }
-                }
 
             public:
-                Result(Promise* promise) noexcept
+                CoroResult(Promise* promise) noexcept
                 : promise(promise)
                 {}
 
-                template <class U>
-                void set(U&& value) noexcept
+                void add_task(IExecutor& executor) noexcept final
                 {
-                    std::lock_guard lock(mutex);
-                    result.emplace(std::forward<U>(value));
-                    emit();
-                }
-
-                void set(typetraits::TTag<std::exception_ptr>, const std::exception_ptr& error) noexcept
-                {
-                    exception = error;
-                    emit();
-                }
-
-                [[nodiscard]] bool ready() const noexcept final
-                {
-                    return exception != nullptr || result.has_value();
-                }
-
-                [[nodiscard]] const T& get() const noexcept final
-                {
-                    if (exception) {
-                        rethrow_exception(exception);
-                    }
-                    return *result;
-                }
-
-                void subscribe(IWorker& worker, IAwaiter& awaiter) final
-                {
-                    std::unique_lock lock(mutex);
-
-                    if (ready()) {
-                        awaiter.wakeup();
-                    } else {
-                        subscribers.PushBack(awaiter);
-                        lock.unlock();
-                        worker.add(promise);
-                    }
+                    executor.add(promise);
                 }
             };
 
-            std::shared_ptr<Result> result = std::make_shared<Result>(this);
-            mutable IWorker* worker = nullptr;
+        private:
+            std::shared_ptr<CoroResult> result = std::make_shared<CoroResult>(this);
+            mutable IExecutor* executor = nullptr;
 
         private:
-            void run(IWorker* worker) noexcept final
+            void run(IExecutor* executor) noexcept final
             {
-                this->worker = worker;
+                this->executor = executor;
                 Handle::from_promise(*this).resume();
             }
 
             void wakeup() noexcept final
             {
-                worker->add(this);
+                executor->add(this);
             }
 
         public:
-            [[nodiscard]] Val<T> get_return_object() const noexcept
+            [[nodiscard]] Val<Ts...> get_return_object() const noexcept
             {
-                return Val<T>(typetraits::tag_t<IResult>, result);
+                return Val<Ts...>(typetraits::tag_t<CoroResult>, result);
             }
 
             auto initial_suspend() const noexcept // NOLINT
@@ -191,12 +459,6 @@ namespace lib::fp {
             }
 
             template <class U>
-            void return_value(Fn<U()> value)
-            {
-                result->set(value());
-            }
-
-            template <class U>
             [[nodiscard]] auto await_transform(U&& value) const noexcept
             {
                 struct Awaiter: std::suspend_never
@@ -211,18 +473,18 @@ namespace lib::fp {
                 return Awaiter{{}, std::forward<U>(value)};
             }
 
-            template <class U>
-            [[nodiscard]] auto await_transform(Fn<U> function) noexcept
+            template <class ...OParams, class Impl>
+            [[nodiscard]] auto await_transform(Fn<I(), O(OParams...), Impl> function) noexcept(std::is_nothrow_move_constructible_v<Fn<I(), O(OParams...), Impl>>)
             {
                 class Awaiter
                 {
-                    Fn<U> function;
+                    using Function = Fn<I(), O(OParams...), Impl>;
+                    Function function;
 
                 public:
-                    Awaiter( Fn<U> function) noexcept
+                    Awaiter(Function function) noexcept(std::is_nothrow_move_constructible_v<Function>)
                     : function(std::move(function))
-                    {
-                    }
+                    {}
 
                 public:
                     [[nodiscard]] bool await_ready() const noexcept
@@ -233,148 +495,96 @@ namespace lib::fp {
                     constexpr void await_suspend(std::coroutine_handle<Promise> handle) noexcept
                     {
                         auto& promise = handle.promise();
-                        auto* worker = promise.worker;
-                        function.subscribe(*worker, promise);
+                        auto* executor = promise.executor;
+                        function.subscribe(*executor, promise);
                     }
 
                     [[nodiscard]] decltype(auto) await_resume() const noexcept
                     {
-                        return function.get();
+                        if constexpr (sizeof...(OParams) == 1) {
+                            return std::get<0>(function.get());
+                        } else {
+                            return function.get();
+                        }
                     }
                 };
 
                 return Awaiter(std::move(function));
             }
         };
+    }
 
-        using promise_type = Promise;
+    template <class ...Ts>
+    class Fn<I(), O(Ts...), Dynamic>
+    {
+        static_assert(sizeof...(Ts) > 0);
+        friend details::Promise<std::tuple<Ts...>>;
+
+    public: // type interface
+        using IType = std::tuple<>;
+        using OType = std::tuple<Ts...>;
+
+    private:
+        std::shared_ptr<details::Result<OType>> result;
 
     public:
+        using promise_type = details::Promise<OType>;        
+
+    private:
+        explicit Fn(typetraits::TTag<typename details::Promise<OType>::CoroResult>, std::shared_ptr<details::Result<OType>> result) noexcept
+        : result(std::move(result))
+        {}
+
+    public: // object interface
         Fn(const Fn& other) noexcept = default;
         Fn(Fn&& other) noexcept = default;
         Fn& operator=(const Fn& other) noexcept = default;
         Fn& operator=(Fn&& other) noexcept = default;
 
         template <class Function>
-        requires (!std::is_same_v<std::remove_cvref_t<Function>, Fn<T()>> && !std::is_same_v<std::remove_cvref_t<Function>, Fn<T>> && std::is_invocable_v<Function>)
+        requires (!std::is_same_v<std::remove_cvref_t<Function>, Fn> && std::is_invocable_r_v<OType, std::remove_cvref_t<Function>>)
         Fn(Function&& function)
+        : result(std::make_shared<typename Fn<I(), O(Ts...), ImplFCall<std::remove_cvref_t<Function>>>::FunctionResult>(std::forward<Function>(function)))
+        {}
+
+        Fn(OType value)
         {
-            class Impl: public IResult, public IWorker::ITask
+            class Impl: public details::Result<OType>
             {
-                Function function;
-                std::optional<T> value;
-
-                mutable data_structures::DLList subscribers;
-                mutable Mutex mutex;
-
-            private:
-                void emit() const noexcept
-                {
-                    for (auto& subscriber: subscribers.Range<IAwaiter>()) {
-                        subscriber.wakeup();
-                    }
-                }
-
             public:
-                Impl(Function&& function)
-                : function(std::forward<Function>(function))
-                {}
-
-                [[nodiscard]] bool ready() const noexcept final
+                Impl(OType value) noexcept(std::is_nothrow_move_constructible_v<OType>)
                 {
-                    return value.has_value();
+                    set(std::move(value));
                 }
 
-                [[nodiscard]] const T& get() const noexcept final
+                void add_task(IExecutor& executor) noexcept final
                 {
-                    return *value;
-                }
-
-                void run(IWorker*) noexcept final
-                {
-                    std::lock_guard lock(mutex);
-                    value = function();
-                    emit();
-                }
-
-                void subscribe(IWorker& worker, IAwaiter& awaiter) final
-                {
-                    std::unique_lock lock(mutex);
-
-                    if (ready()) {
-                        lock.unlock();
-                        awaiter.wakeup();
-                    } else {
-                        subscribers.PushBack(awaiter);
-                        lock.unlock();
-                        worker.add(this);
-                    }
-                }
-            };
-
-            result = std::make_shared<Impl>(std::forward<Function>(function));
-        }
-
-        Fn(T value)
-        {
-            class Impl: public IResult
-            {
-                T value;
-
-            public:
-                Impl(T value)
-                : value(std::move(value))
-                {}
-
-                [[nodiscard]] bool ready() const noexcept final
-                {
-                    return true;
-                }
-
-                [[nodiscard]] const T& get() const noexcept final
-                {
-                    return value;
-                }
-
-                void subscribe(IWorker&, IAwaiter& awaiter) final
-                {
-                    awaiter.wakeup();
                 }
             };
 
             result = std::make_shared<Impl>(std::move(value));
         }
 
-        const T& operator()(IWorker& worker) const
-        {
-            class Awaiter: public IAwaiter
-            {
-                mutable std::binary_semaphore sem {0};
-
-            public:
-                void wakeup() noexcept final
-                {
-                    sem.release();
-                }
-
-                void wait() noexcept
-                {
-                    sem.acquire();
-                }
-            };
-
-            Awaiter awaiter;
-            result->subscribe(worker, awaiter);
-            while (auto* task = worker.get()) {
-                task->run(&worker);
-            }
-            awaiter.wait();
-            return result->get();
-        }
-
-        Fn<T()> operator()() const noexcept
+    public: // currying interface
+        const Fn& operator () (const IType&) const noexcept
         {
             return *this;
+        }
+
+        const Fn& operator () () const noexcept
+        {
+            return *this;
+        }
+
+    public: // runtime interface
+        const auto& operator()(IExecutor& executor) const noexcept
+        {
+            const auto& value = result->execute(executor);
+            if constexpr (sizeof...(Ts) == 1) {
+                return std::get<0>(value);
+            } else {
+                return value;
+            }
         }
 
         [[nodiscard]] bool ready() const noexcept
@@ -382,27 +592,24 @@ namespace lib::fp {
             return result->ready();
         }
 
-        [[nodiscard]] const T& get() const noexcept
+        [[nodiscard]] const OType& get() const noexcept
         {
             return result->get();
         }
     
-        void subscribe(IWorker& worker, IAwaiter& awaiter)
+        void subscribe(IExecutor& executor, IAwaiter& awaiter)
         {
-            result->subscribe(worker, awaiter);
+            result->subscribe(executor, awaiter);
         }
     };
 
-    template <class T>
-    Fn(T value) ->Fn<T()>;
-
     unittest {
-        SimpleWorker worker;
+        SimpleExecutor executor;
 
-        Val<int> function = [] { return 42; };
-        check(function(worker) == 42);
-        function = 13;
-        check(function(worker) == 13);
+        Fn fcall = [] { return 42; };
+        check(fcall(executor) == 42);
+        Fn value = 13;
+        check(value(executor) == 13);
     };
 
     namespace details {
@@ -412,10 +619,10 @@ namespace lib::fp {
         }
 
         unittest {
-            SimpleWorker worker;
+            SimpleExecutor executor;
 
             const auto function = test_coro();
-            check(function(worker) == 42);
+            check(function(executor) == 42);
         }
 
         inline Val<int> test_coro(Val<int> param)
@@ -424,38 +631,32 @@ namespace lib::fp {
         }
 
         unittest {
-            SimpleWorker worker;
+            SimpleExecutor executor;
 
             const auto function = test_coro(test_coro());
-            check(function(worker) == 43);
+            check(function(executor) == 43);
         }
     }
 
     template <class T>
     struct FnWrapper
     {
-        using Type = Fn<T()>;
+        using Type = Fn<I(), O(T), ImplValue<T>>;
     };
 
-    template <class R, class ...TArgs>
-    struct FnWrapper<Fn<R(TArgs...)>>
+    template <class ...IArgs, class ...OArgs, class Impl>
+    struct FnWrapper<Fn<I(IArgs...), O(OArgs...), Impl>>
     {
-        using Type = Fn<R(TArgs...)>;
+        using Type = Fn<I(IArgs...), O(OArgs...), Impl>;
     };
 
     template <class T>
-    using Wrapper = typename FnWrapper<T>::Type;
+    using Wrapper = typename FnWrapper<std::remove_cvref_t<T>>::Type;
 
-    template <class T>
-    Val<T> wrap(T value)
+    template <class T, class Fn = Wrapper<T>>
+    Fn wrap(T&& value)
     {
-        return value;
-    }
-
-    template <class R, class ...TArgs>
-    Fn<R(TArgs...)> wrap(Fn<R(TArgs...)> fn) noexcept
-    {
-        return fn;
+        return Fn(std::forward<T>(value));
     }
 
     namespace details {
@@ -491,19 +692,19 @@ namespace lib::fp {
             using OArgs = TArgs;
         };
 
-        template<class Head, class ...Tail, class R, class ...TArgs, class ...Params>
-        struct CarryingF<typetraits::List<Head, Tail...>, Fn<R(TArgs...)>, Params...>
+        template<class Head, class ...Tail, class ...FIArgs, class ...FOArgs, class Impl, class ...Params>
+        struct CarryingF<typetraits::List<Head, Tail...>, Fn<I(FIArgs...), O(FOArgs...), Impl>, Params...>
         {
-            using IArgs = typetraits::Concat<typetraits::List<TArgs...>, typename CarryingF<typetraits::List<Tail...>, Params...>::IArgs>;
+            using IArgs = typetraits::Concat<typetraits::List<FIArgs...>, typename CarryingF<typetraits::List<Tail...>, Params...>::IArgs>;
             using CIndx = typetraits::Concat<
-                typetraits::List<std::index_sequence_for<TArgs...>>,
-                AddOffset<sizeof...(TArgs), typename CarryingF<typetraits::List<Tail...>, Params...>::CIndx>
+                typetraits::List<std::index_sequence_for<FIArgs...>>,
+                AddOffset<sizeof...(FIArgs), typename CarryingF<typetraits::List<Tail...>, Params...>::CIndx>
             >;
             using OArgs = typename CarryingF<typetraits::List<Tail...>, Params...>::OArgs;
         };
 
-        template<class ...Tail, class R, class ...TArgs, class ...Params>
-        struct CarryingF<typetraits::List<Fn<R(TArgs...)>, Tail...>, Fn<R(TArgs...)>, Params...>
+        template<class ...Tail, class ...FIArgs, class ...FOArgs, class LImpl, class RImpl, class ...Params>
+        struct CarryingF<typetraits::List<Fn<I(FIArgs...), O(FOArgs...), LImpl>, Tail...>, Fn<I(FIArgs...), O(FOArgs...), RImpl>, Params...>
         {
             using IArgs = typename CarryingF<typetraits::List<Tail...>, Params...>::IArgs;
             using CIndx = typetraits::Concat<
@@ -516,55 +717,70 @@ namespace lib::fp {
         template <class TArgs, class ...IArgs>
         using CarryingIArgs = typename CarryingF<TArgs, IArgs...>::IArgs;
 
-        static_assert(std::is_same_v<CarryingIArgs<typetraits::List<int, float, double>, Fn<int(int, float)>>, typetraits::List<int, float>>);
-        static_assert(std::is_same_v<CarryingIArgs<typetraits::List<int, float, double>, Fn<int(int, float)>, Fn<void(double)>>, typetraits::List<int, float, double>>);
-        static_assert(std::is_same_v<CarryingIArgs<typetraits::List<int, float, int, double>, Fn<int(int, float)>, Fn<int()>, Fn<void(double)>>, typetraits::List<int, float, double>>);
-        static_assert(std::is_same_v<CarryingIArgs<typetraits::List<int, int, float, int, double>, Fn<int()>, Fn<int(int, float)>, Fn<int()>, Fn<void(double)>>, typetraits::List<int, float, double>>);
-        static_assert(std::is_same_v<CarryingIArgs<typetraits::List<Fn<double(int)>, float>, Fn<double(int)>>, typetraits::List<>>);
+        static_assert(std::is_same_v<CarryingIArgs<typetraits::List<int, float, double>, Fn<I(int, float), O(int)>>, typetraits::List<int, float>>);
+        static_assert(std::is_same_v<CarryingIArgs<typetraits::List<int, float, double>, Fn<I(int, float), O(int)>, Fn<I(double), O(float)>>, typetraits::List<int, float, double>>);
+        static_assert(std::is_same_v<CarryingIArgs<typetraits::List<int, float, int, double>, Fn<I(int, float), O(int)>, Fn<I(), O(float)>, Fn<I(double), O(int)>>, typetraits::List<int, float, double>>);
+        static_assert(std::is_same_v<CarryingIArgs<typetraits::List<int, int, float, int, double>, Fn<I(), O(int)>, Fn<I(int, float), O(int)>, Fn<I(), O(float)>, Fn<I(double), O(double)>>, typetraits::List<int, float, double>>);
+        static_assert(std::is_same_v<CarryingIArgs<typetraits::List<Fn<I(int), O(double)>, float>, Fn<I(int), O(double)>>, typetraits::List<>>);
 
 
         template <class TArgs, class ...IArgs>
         using CarryingCIndx = typename CarryingF<TArgs, IArgs...>::CIndx;
 
-        static_assert(std::is_same_v<CarryingCIndx<typetraits::List<int, float, double>, Fn<int(int, float)>>, typetraits::List<std::index_sequence<0, 1>>>);
-        static_assert(std::is_same_v<CarryingCIndx<typetraits::List<int, float, double>, Fn<int(int, float)>, Fn<void(double)>>, typetraits::List<std::index_sequence<0, 1>, std::index_sequence<2>>>);
-        static_assert(std::is_same_v<CarryingCIndx<typetraits::List<int, float, int, double>, Fn<int(int, float)>, Fn<int()>, Fn<void(double)>>, typetraits::List<std::index_sequence<0, 1>, std::index_sequence<>, std::index_sequence<2>>>);
+        static_assert(std::is_same_v<CarryingCIndx<typetraits::List<int, float, double>, Fn<I(int, float), O(int)>>, typetraits::List<std::index_sequence<0, 1>>>);
+        static_assert(std::is_same_v<CarryingCIndx<typetraits::List<int, float, double>, Fn<I(int, float), O(int)>, Fn<I(double), O(float)>>, typetraits::List<std::index_sequence<0, 1>, std::index_sequence<2>>>);
+        static_assert(std::is_same_v<CarryingCIndx<typetraits::List<int, float, int, double>, Fn<I(int, float), O(int)>, Fn<I(), O(float)>, Fn<I(double), O()>>, typetraits::List<std::index_sequence<0, 1>, std::index_sequence<>, std::index_sequence<2>>>);
 
         template <class TArgs, class ...IArgs>
         using CarryingOArgs = typename CarryingF<TArgs, IArgs...>::OArgs;
 
-        static_assert(std::is_same_v<CarryingOArgs<typetraits::List<int, float, double>, Fn<int(int, float)>>, typetraits::List<float, double>>);
-        static_assert(std::is_same_v<CarryingOArgs<typetraits::List<int, float, double>, Fn<int(int, float)>, Fn<float(double)>>, typetraits::List<double>>);
-        static_assert(std::is_same_v<CarryingOArgs<typetraits::List<int, float, int, double>, Fn<int(int, float)>, Fn<int()>, Fn<void(double)>, Fn<double()>>, typetraits::List<>>);
-        static_assert(std::is_same_v<CarryingOArgs<typetraits::List<Fn<double(int)>, Fn<float(int)>>, Fn<double(int)>>, typetraits::List<Fn<float(int)>>>);
+        static_assert(std::is_same_v<CarryingOArgs<typetraits::List<int, float, double>, Fn<I(int, float), O(int)>>, typetraits::List<float, double>>);
+        static_assert(std::is_same_v<CarryingOArgs<typetraits::List<int, float, double>, Fn<I(int, float), O(int)>, Fn<I(double), O(float)>>, typetraits::List<double>>);
+        static_assert(std::is_same_v<CarryingOArgs<typetraits::List<int, float, int, double>, Fn<I(int, float), O(int)>, Fn<I(), O(int)>, Fn<I(double), O(int)>, Fn<I(), O(double)>>, typetraits::List<>>);
+        static_assert(std::is_same_v<CarryingOArgs<typetraits::List<Fn<I(int), O(double)>, Fn<I(int), O(float)>>, Fn<I(int), O(double)>>, typetraits::List<Fn<I(int), O(float)>>>);
 
 
-        template <class R, class ...TArgs, class Tuple, std::size_t ...I>
-        decltype(auto) apply(const Fn<R(TArgs...)>& function, const Tuple& params, std::index_sequence<I...>)
+        template <class ...IArgs, class ...OArgs, class Impl, class Tuple, std::size_t ...Index>
+        decltype(auto) apply(const Fn<I(IArgs...), O(OArgs...), Impl>& function, const Tuple& params, std::index_sequence<Index...>)
         {
-            return function(std::get<I>(params)...);
+            return function(std::get<Index>(params)...);
         }
     }
 
-    template <class R, class ...TArgs>
-    class Fn<R(TArgs...)>
+    template <class ...IParams, class ...OParams>
+    class Fn<I(IParams...), O(OParams...), Dynamic>
     {
+        static_assert(sizeof...(IParams) + sizeof...(OParams) > 0);
+
+    public: // type interface
+        using IType = std::tuple<IParams...>;
+        using OType = std::tuple<OParams...>;
+
+    private:
         class IFunction
         {
         public:
-            [[nodiscard]] virtual Fn<R()> run(Wrapper<TArgs>...) const = 0;
+            [[nodiscard]] virtual Val<OParams...> run(Wrapper<IParams>...) const = 0;
         };
 
         std::shared_ptr<IFunction> ifunction;
 
-    public:
+    public: // object interface
         Fn(const Fn& other) noexcept = default;
         Fn(Fn&& other) noexcept = default;
         Fn& operator=(const Fn& other) noexcept = default;
         Fn& operator=(Fn&& other) noexcept = default;
 
         template <class Function>
-        requires (!std::is_same_v<std::remove_cvref_t<Function>, Fn>)
+        requires (
+            !std::is_same_v<std::remove_cvref_t<Function>, Fn>
+            &&
+            (
+                std::is_invocable_r_v<OType, std::remove_cvref_t<Function>, IParams...>
+                ||
+                std::is_invocable_r_v<Val<OParams...>, std::remove_cvref_t<Function>, IParams...>
+            )
+        )
         Fn(Function&& function)
         {
             class Impl: public IFunction
@@ -576,34 +792,33 @@ namespace lib::fp {
                 : function(std::forward<Function>(function))
                 {}
 
-                [[nodiscard]] Val<R> run(Wrapper<TArgs>... args) const final
+                [[nodiscard]] Val<OParams...> run(Wrapper<IParams>... args) const final
                 {
                     co_return co_await function(co_await args...);
                 }
             };
 
-            auto nfunction = std::make_shared<Impl>(std::forward<Function>(function));
-            ifunction = nfunction;
+            ifunction = std::make_shared<Impl>(std::forward<Function>(function));
         }
 
     private:
         template <class ...IArgs, class ...OArgs, class ...CIndx, class ...Args>
         [[nodiscard]] auto currying(typetraits::TTag<typetraits::List<IArgs...>>, typetraits::TTag<typetraits::List<OArgs...>>, typetraits::TTag<typetraits::List<CIndx...>>, Args ...cargs) const
         {
-            auto function = [cargs..., ifunction = this->ifunction](IArgs ...iargs, OArgs ...oargs) -> Val<R> {
+            auto function = [cargs..., ifunction = this->ifunction](IArgs ...iargs, OArgs ...oargs) -> Val<OParams...> {
                 const auto iargs_list = std::tie(iargs...);
                 auto result = co_await ifunction->run(details::apply(cargs, iargs_list, CIndx{})..., oargs...);
                 co_return result;
             };
-            return Fn<R(IArgs..., OArgs...)>(std::move(function));
+            return Fn<I(IArgs..., OArgs...), O(OParams...)>(std::move(function));
         }
 
         template <class ...Args>
         [[nodiscard]] auto currying(Args ...args) const
         {
-            using IArgs = details::CarryingIArgs<typetraits::List<TArgs...>, Args...>;
-            using OArgs = details::CarryingOArgs<typetraits::List<TArgs...>, Args...>;
-            using CIndx = details::CarryingCIndx<typetraits::List<TArgs...>, Args...>;
+            using IArgs = details::CarryingIArgs<typetraits::List<IParams...>, Args...>;
+            using OArgs = details::CarryingOArgs<typetraits::List<IParams...>, Args...>;
+            using CIndx = details::CarryingCIndx<typetraits::List<IParams...>, Args...>;
 
             if constexpr (std::is_same_v<typetraits::Concat<IArgs, OArgs>, typetraits::List<>>) {
                 return ifunction->run(args...);
@@ -612,53 +827,75 @@ namespace lib::fp {
             }
         }
 
-    public:
+    public: // currying interface
         template <class ...IArgs>
         auto operator()(IArgs ...args) const
         {
-            static_assert(sizeof...(IArgs) <= sizeof...(TArgs));
-            return currying(wrap(args)...);
+            static_assert(sizeof...(IArgs) <= sizeof...(IParams));
+            return currying(wrap(std::forward<IArgs>(args))...);
         }
 
-        Fn<R(TArgs...)> operator()() const noexcept
+        template <class ...IArgs>
+        auto operator()(const std::tuple<IArgs...>& args) const
+        {
+            return std::apply(*this, args);
+        }
+
+        template <class ...IArgs, class Impl>
+        auto operator()(const Fn<I(IArgs...), O(IParams...), Impl>& other) const
+        {
+            if constexpr (sizeof...(IArgs)) {
+                auto function = [other, ifunction = this->ifunction](IArgs ...args) -> Val<OParams...> {
+                    auto result = co_await ifunction->run(co_await other(args...));
+                    co_return result;
+                };
+                return Fn<I(IArgs...), O(OParams...)>(std::move(function));
+            } else {
+                return ifunction->run(other);
+            }
+        }
+
+        const Fn& operator()() const noexcept
         {
             return *this;
         }
     };
 
-    unittest {
-        SimpleWorker worker;
+    template <class R, class ...TArgs>
+    Fn(R(* function)(TArgs...)) -> Fn<I(TArgs...), TypeToParams<O, R>>;
 
-        Fn<int(int, int)> sum = [] (int lhs, int rhs) noexcept {
+    unittest {
+        SimpleExecutor executor;
+
+        int (*function)(int, int) = [] (int lhs, int rhs) noexcept {
             return lhs + rhs;
         };
-        check(sum(1, 2)(worker) == 3);
-        check(sum(3)(2)(worker) == 5);
+        Fn sum = function;
+        check(sum(1, 2)(executor) == 3);
+        check(sum(3)(2)(executor) == 5);
     }
 
     unittest {
-        SimpleWorker worker;
+        SimpleExecutor executor;
 
-        const auto sum_coro = [](Val<int> lhs, Val<int> rhs) -> Val<int> {
-            const auto l = co_await lhs;
-            const auto r = co_await rhs;
-            co_return l + r;
+        const auto sum_coro = [](int lhs, int rhs) -> Val<int> {
+            co_return lhs + rhs;
         };
 
-        Fn<int(int, int)> sum = sum_coro;
-        check(sum(1, 2)(worker) == 3);
-        check(sum(3)(2)(worker) == 5);
+        Fn<I(int, int), O(int)> sum = sum_coro;
+        check(sum(1, 2)(executor) == 3);
+        check(sum(3)(2)(executor) == 5);
     }
 
     unittest {
-        SimpleWorker worker;
+        SimpleExecutor executor;
 
-        Fn<std::string(std::string_view, const char*)> concat = [](std::string_view lhs, const char* rhs) -> std::string {
+        Fn<I(std::string_view, const char*), O(std::string)> concat = [](std::string_view lhs, const char* rhs) -> std::string {
             std::string result(lhs.begin(), lhs.end());
             result.append(rhs);
             return result;
         };
-        check(concat(std::string_view("hello"), "world")(worker) == "helloworld");
-        check(concat(std::string_view("hello"))("world")(worker) == "helloworld");
+        check(concat(std::string_view("hello"), "world")(executor) == "helloworld");
+        check(concat(std::string_view("hello"))("world")(executor) == "helloworld");
     }
 }

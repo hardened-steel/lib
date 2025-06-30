@@ -4,41 +4,37 @@
 
 namespace lib::fp {
 
-    template <class ...IParams, class Middle, class To>
-    Fn<To(IParams...)> map(Fn<Middle(IParams...)> lhs, Fn<To(Middle)> rhs)
+    template <class ...IParams, class ...MParams, class ...OParams, class LImpl, class RImpl>
+    auto map(Fn<I(IParams...), O(MParams...), LImpl> lhs, Fn<I(MParams...), O(OParams...), RImpl> rhs)
     {
         return rhs(lhs);
     }
 
-    template <class ...IParams, class Middle, class To>
-    auto operator | (Fn<Middle(IParams...)> lhs, Fn<To(Middle)> rhs)
+    template <class Lhs, class Rhs>
+    requires (is_function<Lhs> || is_function<Rhs>)
+    auto operator | (Lhs lhs, Rhs rhs)
     {
         return map(lhs, rhs);
     }
 
-    template <class T, class From, class To>
-    Val<To> map(T value, Fn<To(From)> convertor)
+    template <class From, class To, class Impl>
+    Val<To> map(From value, Fn<I(From), O(To), Impl> convertor)
     {
         return map(Fn(value), convertor);
     }
 
-    template <class T, class From, class To>
-    auto operator | (T value, Fn<To(From)> convertor)
-    {
-        return map(value, convertor);
-    }
-
     unittest {
-        SimpleWorker worker;
+        SimpleExecutor executor;
 
-        const Fn<std::string(int)> convertor = [](int value) {
+        const Fn<I(int), O(std::string)> convertor = [](int value) {
             return std::to_string(value);
         };
-        check(map(0, convertor)(worker) == "0");
-        check(map(1, convertor)(worker) == "1");
-        check(map(3, convertor)(worker) == "3");
+        check(map(0, convertor)(executor) == "0");
+        check(map(1, convertor)(executor) == "1");
+        check(map(3, convertor)(executor) == "3");
+        check((4 | convertor)(executor) == "4");
 
-        const Val<int> value = 42;
-        check(map(value, convertor)(worker) == "42");
+        const Fn value = 42;
+        check(map(value, convertor)(executor) == "42");
     }
 }
