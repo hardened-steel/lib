@@ -43,10 +43,10 @@ namespace lib::fp {
         using Type = Fn<T, ImplValue<T>>;
     };
 
-    template <class T, class ...TArgs>
-    struct FnWrapper<Fn<T, TArgs...>>
+    template <class ...TArgs>
+    struct FnWrapper<Fn<TArgs...>>
     {
-        using Type = Fn<T, TArgs...>;
+        using Type = Fn<TArgs...>;
     };
 
     template <class T>
@@ -58,14 +58,14 @@ namespace lib::fp {
         return Wrapper<T>(std::forward<T>(value));
     }
 
-    template <class T, class ...TArgs>
-    decltype(auto) wrap(Fn<T, TArgs...>&& value)
+    template <class ...TArgs>
+    decltype(auto) wrap(Fn<TArgs...>&& value)
     {
         return std::move(value);
     }
 
-    template <class T, class ...TArgs>
-    decltype(auto) wrap(const Fn<T, TArgs...>& value)
+    template <class ...TArgs>
+    decltype(auto) wrap(const Fn<TArgs...>& value)
     {
         return value;
     }
@@ -150,7 +150,7 @@ namespace lib::fp {
         Fn(const T& value)
             noexcept(std::is_nothrow_copy_constructible_v<T>)
             requires (std::is_array_v<T>)
-        : Fn(value, std::index_sequence<std::extent_v<T>>{})
+        : Fn(value, std::make_index_sequence<std::extent_v<T>>{})
         {}
 
         Fn() = delete;
@@ -362,15 +362,15 @@ namespace lib::fp {
             , private IAwaiter
         {
             details::FunctionPtr<Function> function;
-            std::tuple<Wrapper<TArgs>...> args;
+            std::tuple<TArgs...> args;
             mutable std::size_t args_ready = 0;
 
         public:
-            FunctionResultImpl(details::FunctionPtr<Function>&& function, std::tuple<Wrapper<TArgs>...> args) noexcept(std::is_nothrow_move_constructible_v<Function>)
+            FunctionResultImpl(details::FunctionPtr<Function>&& function, std::tuple<TArgs...> args) noexcept(std::is_nothrow_move_constructible_v<Function>)
             : function(std::move(function)), args(args)
             {}
 
-            FunctionResultImpl(const details::FunctionPtr<Function>& function, std::tuple<Wrapper<TArgs>...> args) noexcept(std::is_nothrow_copy_constructible_v<Function>)
+            FunctionResultImpl(const details::FunctionPtr<Function>& function, std::tuple<TArgs...> args) noexcept(std::is_nothrow_copy_constructible_v<Function>)
             : function(function), args(args)
             {}
 
@@ -391,7 +391,7 @@ namespace lib::fp {
             void wakeup(IExecutor* executor) noexcept final
             {
                 if (++args_ready == sizeof...(TArgs)) {
-                    apply(executor, std::make_index_sequence<sizeof...(TArgs)>{});
+                    executor->add(this);
                 }
             }
 
@@ -400,13 +400,36 @@ namespace lib::fp {
             {
                 args_ready = ((std::get<I>(args).subscribe(*executor, *this) ? 1U : 0U) + ... + 0);
                 if (args_ready == sizeof...(TArgs)) {
-                    apply(executor, std::make_index_sequence<sizeof...(TArgs)>{});
+                    executor->add(this);
                 }
             }
 
             void run(IExecutor* executor) noexcept final
             {
-                run(executor, std::make_index_sequence<sizeof...(TArgs)>{});
+                if (args_ready == 0) {
+                    run(executor, std::make_index_sequence<sizeof...(TArgs)>{});
+                }
+                if (args_ready != 0) {
+                    apply(executor, std::make_index_sequence<sizeof...(TArgs)>{});
+                }
+            }
+        };
+
+        template <class Function, class R>
+        class FunctionResultImpl<Function, R, R, typetraits::List<>>
+            : public details::Result<R>
+        {
+        public:
+            FunctionResultImpl(const details::FunctionPtr<Function>& function, std::tuple<>) noexcept
+            try {
+                details::Result<R>::set(nullptr, (*function)());
+            } catch (...) {
+                details::Result<R>::set(typetraits::tag_t<std::exception_ptr>, nullptr, std::current_exception());
+            }
+
+        private:
+            void add_task(IExecutor&) noexcept final
+            {
             }
         };
 
@@ -416,7 +439,7 @@ namespace lib::fp {
             , private IAwaiter
         {
             details::FunctionPtr<Function> function;
-            std::tuple<Wrapper<TArgs>...> args;
+            std::tuple<TArgs...> args;
             mutable std::size_t args_ready = 0;
 
             enum class State {
@@ -438,7 +461,7 @@ namespace lib::fp {
             }
 
         public:
-            FunctionResultImpl(const details::FunctionPtr<Function>& function, const std::tuple<Wrapper<TArgs>...>& args)
+            FunctionResultImpl(const details::FunctionPtr<Function>& function, const std::tuple<TArgs...>& args)
                 noexcept(std::is_nothrow_copy_constructible_v<Function>)
             : function(function), args(args)
             {}
@@ -540,10 +563,10 @@ namespace lib::fp {
         };
 
         template <class Function, class R, class ...TArgs>
-        class FunctionResult: public FunctionResultImpl<Function, R, std::invoke_result_t<Function, TArgs...>, typetraits::List<TArgs...>>
+        class FunctionResult: public FunctionResultImpl<Function, R, std::invoke_result_t<Function, typename TArgs::Result ...>, typetraits::List<TArgs...>>
         {
         public:
-            using FunctionResultImpl<Function, R, std::invoke_result_t<Function, TArgs...>, typetraits::List<TArgs...>>::FunctionResultImpl;
+            using FunctionResultImpl<Function, R, std::invoke_result_t<Function, typename TArgs::Result ...>, typetraits::List<TArgs...>>::FunctionResultImpl;
         };
     }
 
@@ -975,7 +998,7 @@ namespace lib::fp {
         )
         auto operator () (Args&& ...iargs) const
         {
-            using OType = FnType<typetraits::PopFront<TArgs, sizeof...(Args)>, ImplFCallAdd<TFImpl, typename Wrapper<std::remove_cvref_t<Args>>::Result ...>>;
+            using OType = FnType<typetraits::PopFront<TArgs, sizeof...(Args)>, ImplFCallAdd<TFImpl, Wrapper<std::remove_cvref_t<Args>> ...>>;
             return OType(function, std::tuple_cat(args, std::make_tuple(wrap(std::forward<Args>(iargs)) ...)));
         }
     };

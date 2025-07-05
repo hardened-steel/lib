@@ -28,17 +28,12 @@ namespace lib::fp {
         class FunctionResult<MapFunction<FLhs, ALhs, FRhs, ARhs>, R, TArgs...>
         {
             using Function = MapFunction<FLhs, ALhs, FRhs, ARhs>;
-            typename Function::OType result;
+            std::invoke_result_t<MapFunction<FLhs, ALhs, FRhs, ARhs>, std::tuple<TArgs...>> result;
 
         public:
-            template <std::size_t ...I>
-            FunctionResult(const Function& function, const std::tuple<Wrapper<TArgs>...>& args, std::index_sequence<I...>)
+            FunctionResult(const Function& function, const std::tuple<TArgs...>& args)
                 noexcept(std::is_nothrow_move_constructible_v<Function>)
-            : result(function(std::get<I>(args)...))
-            {}
-
-            FunctionResult(const Function& function, const std::tuple<Wrapper<TArgs>...>& args) noexcept(std::is_nothrow_move_constructible_v<Function>)
-            : FunctionResult(function, args, std::make_index_sequence<sizeof...(TArgs)>{})
+            : result(function(args))
             {}
 
         public:
@@ -77,12 +72,23 @@ namespace lib::fp {
 
             MapFunction(const MapFunction& other) noexcept = default;
 
-        public:
-            using OType = std::invoke_result_t<Rhs, std::invoke_result_t<Lhs, Wrapper<LArgs>...>, Wrapper<RArgs>...>;
-
-            OType operator()(Wrapper<LArgs>&& ...l_args, Wrapper<RArgs>&& ...r_args) const
+        private:
+            template <class ...TArgs, std::size_t ...LI, std::size_t ...RI>
+            [[nodiscard]] auto call(const std::tuple<TArgs...>& args, std::index_sequence<LI...>, std::index_sequence<RI...>) const
             {
-                return rhs(lhs(std::move(l_args)...), std::move(r_args)...);
+                return rhs(lhs(std::get<LI>(args)...), std::get<RI>(args)...);
+            }
+
+        public:
+            template <class ...TArgs>
+            requires (sizeof...(TArgs) == sizeof...(LArgs) + sizeof...(RArgs) && (is_function<TArgs> && ...))
+            auto operator()(const std::tuple<TArgs...>& args) const
+            {
+                return call(
+                    args,
+                    std::make_index_sequence<sizeof...(LArgs)>{},
+                    indexes::Add<sizeof...(LArgs), std::make_index_sequence<sizeof...(RArgs)>>{}
+                );
             }
         };
     }
@@ -111,6 +117,13 @@ namespace lib::fp {
         return map(wrap(std::forward<T>(value)), function);
     }
 
+    template <class F, class T>
+    requires (is_function<std::remove_cvref_t<F>> && !is_function<std::remove_cvref_t<T>>)
+    auto map(F lhs, T&& rhs)
+    {
+        return map(lhs, Fn(std::forward<T>(rhs)));
+    }
+
     template <class Lhs, class Rhs>
     requires (is_function<Lhs> || is_function<Rhs>)
     auto operator | (Lhs lhs, Rhs rhs)
@@ -132,5 +145,18 @@ namespace lib::fp {
 
         const Fn value = 42;
         check(map(value, convertor)(executor) == "42");
+    }
+
+    unittest {
+        SimpleExecutor executor;
+
+        int (*do_inc)(int) = [](int value) {
+            return value + 1;
+        };
+        const Fn inc = do_inc;
+
+        check((map(1, map(inc, inc)))(executor) == 3);
+        check((map(map(1, inc), inc))(executor) == 3);
+        check((1 | inc | inc | do_inc)(executor) == 4);
     }
 }
