@@ -1,5 +1,7 @@
 #pragma once
+#include <tuple>
 #include <cstddef>
+
 
 namespace lib::typetraits {
 
@@ -7,6 +9,7 @@ namespace lib::typetraits {
     struct List
     {
         constexpr static inline std::size_t size = sizeof...(Ts);
+        using Tuple = std::tuple<Ts...>;
     };
 
     namespace impl {
@@ -101,6 +104,9 @@ namespace lib::typetraits {
     template <class List, std::size_t Index>
     using Get = impl::Get<List, Index>;
 
+    template <class List>
+    using Last = impl::Get<List, List::size - 1>;
+
     namespace impl {
         template <class ...Lists>
         struct ConcatF;
@@ -183,4 +189,50 @@ namespace lib::typetraits {
 
     template <class List, std::size_t Index>
     using Remove = impl::Remove<List, Index>;
+
+    namespace impl {
+        template <class List, std::size_t Count>
+        struct PopBackF;
+
+        template <class List, std::size_t Count>
+        using PopBack = typename PopBackF<List, Count>::Result;
+
+        template <class List, std::size_t Count>
+        struct PopBackF
+        {
+            using Result = PopBack<Remove<List, List::size - 1>, Count - 1>;
+        };
+
+        template <class List>
+        struct PopBackF<List, 0>
+        {
+            using Result = List;
+        };
+    }
+
+    template <class List, std::size_t Count = 1>
+    using PopBack = impl::PopBack<List, Count>;
+
+    namespace impl {
+        template <class List, std::size_t Count>
+        struct PopFrontF;
+
+        template <class List, std::size_t Count>
+        using PopFront = typename PopFrontF<List, Count>::Result;
+
+        template <class List, std::size_t Count>
+        struct PopFrontF
+        {
+            using Result = PopFront<Remove<List, 0>, Count - 1>;
+        };
+
+        template <class List>
+        struct PopFrontF<List, 0>
+        {
+            using Result = List;
+        };
+    }
+
+    template <class List, std::size_t Count = 1>
+    using PopFront = impl::PopFront<List, Count>;
 }

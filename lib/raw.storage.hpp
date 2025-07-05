@@ -14,19 +14,19 @@ namespace lib {
     public:
         T* ptr() noexcept
         {
-            return reinterpret_cast<T*>(buffer);
+            return std::launder(reinterpret_cast<T*>(buffer));
         }
 
         const T* ptr() const noexcept
         {
-            return reinterpret_cast<const T*>(buffer);
+            return std::launder(reinterpret_cast<const T*>(buffer));
         }
 
         template <class ...TArgs>
         T* emplace(TArgs&& ...args)
         noexcept(std::is_nothrow_constructible_v<T, TArgs...>)
         {
-            return std::construct_at(ptr(), std::forward<TArgs>(args)...);
+            return std::construct_at(reinterpret_cast<T*>(buffer), std::forward<TArgs>(args)...);
         }
 
         void destroy() noexcept
