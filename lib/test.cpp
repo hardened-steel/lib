@@ -27,11 +27,15 @@ namespace lib {
         Test::Check check;
         for (const auto& [location, test]: GetTestCaseList()) {
             check.reset();
-            test(check);
-            if (check.test_failed()) {
+            try {
+                test(check);
+                if (check.test_failed()) {
+                    f_tests++;
+                } else {
+                    s_tests++;
+                }
+            } catch (...) {
                 f_tests++;
-            } else {
-                s_tests++;
             }
         }
         std::cout << "report:\n";

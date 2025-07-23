@@ -10,7 +10,6 @@
 #include <lib/semaphore.hpp>
 
 #include <memory>
-#include <optional>
 #include <coroutine>
 
 
@@ -222,7 +221,18 @@ namespace lib::fp {
         };
 
         template <class T>
-        class Result
+        class IResult
+        {
+        public:
+            [[nodiscard]] virtual bool ready() const noexcept = 0;
+            [[nodiscard]] virtual const T& get() const = 0;
+            [[nodiscard]] virtual bool subscribe(IExecutor& executor, IAwaiter& awaiter) = 0;
+            [[nodiscard]] virtual const T& wait(IExecutor& executor) = 0;
+            virtual ~IResult() noexcept = default;
+        };
+
+        template <class T>
+        class Result: public IResult<T>
         {
             enum class State {
                 Stop, Running, Ready
@@ -244,10 +254,10 @@ namespace lib::fp {
                 }
             }
 
-            virtual void add_task(IExecutor& executor) noexcept = 0;
+            virtual void add_task(IExecutor&) noexcept {};
 
         public:
-            ~Result()
+            ~Result() override
             {
                 if (state == State::Ready) {
                     result.destroy();
@@ -269,22 +279,25 @@ namespace lib::fp {
                 emit(executor);
             }
 
-            [[nodiscard]] bool ready() const noexcept
+            [[nodiscard]] bool ready() const noexcept final
             {
                 std::lock_guard lock(mutex);
                 return state == State::Ready;
             }
 
-            [[nodiscard]] const T& get() const
+            [[nodiscard]] const T& get() const final
             {
                 std::lock_guard lock(mutex);
                 if (exception) {
                     rethrow_exception(exception);
                 }
-                return *result.ptr();
+                if (state == State::Ready) {
+                    return *result.ptr();
+                }
+                throw std::runtime_error("value is not ready");
             }
 
-            bool subscribe(IExecutor& executor, IAwaiter& awaiter)
+            [[nodiscard]] bool subscribe(IExecutor& executor, IAwaiter& awaiter) final
             {
                 std::lock_guard lock(mutex);
                 switch (state) {
@@ -302,7 +315,7 @@ namespace lib::fp {
                 return false;
             }
 
-            const T& wait(IExecutor& executor)
+            [[nodiscard]] const T& wait(IExecutor& executor) final
             {
                 Awaiter awaiter;
                 if (!subscribe(executor, awaiter)) {
@@ -352,6 +365,34 @@ namespace lib::fp {
             return function;
         }
 
+        template <class T, bool Cast>
+        decltype(auto) unwrap(T&& arg, typetraits::VTag<Cast>)
+        {
+            if constexpr (Cast) {
+                return std::forward<T>(arg);
+            } else {
+                return std::forward<T>(arg).get();
+            }
+        }
+
+        template <class T, std::size_t A, std::size_t B>
+        decltype(auto) check_cast(T&& arg, typetraits::VTag<A, B>)
+        {
+            return unwrap(std::forward<T>(arg), typetraits::tag_v<A == B>);
+        }
+
+        template <class Function, class TArgs, std::size_t I, class Indexes>
+        struct CheckCast;
+
+        template <class Function, class TArgs, std::size_t I, std::size_t ...Is>
+        struct CheckCast<Function, TArgs, I, std::index_sequence<Is...>>
+        {
+            constexpr static inline bool value = std::invocable<Function, decltype(check_cast(std::get<Is>(std::declval<TArgs>()), typetraits::tag_v<I, Is>))...>; 
+        };
+
+        template <class Function, std::size_t I, class TArgs>
+        concept could_call_without_cast = CheckCast<Function, TArgs, I, std::make_index_sequence<std::tuple_size_v<TArgs>>>::value;
+
         template <class Function, class ER, class FR, class TArgs>
         class FunctionResultImpl;
 
@@ -366,11 +407,13 @@ namespace lib::fp {
             mutable std::size_t args_ready = 0;
 
         public:
-            FunctionResultImpl(details::FunctionPtr<Function>&& function, std::tuple<TArgs...> args) noexcept(std::is_nothrow_move_constructible_v<Function>)
+            FunctionResultImpl(details::FunctionPtr<Function>&& function, std::tuple<TArgs...> args)
+                noexcept(std::is_nothrow_move_constructible_v<Function>)
             : function(std::move(function)), args(args)
             {}
 
-            FunctionResultImpl(const details::FunctionPtr<Function>& function, std::tuple<TArgs...> args) noexcept(std::is_nothrow_copy_constructible_v<Function>)
+            FunctionResultImpl(const details::FunctionPtr<Function>& function, std::tuple<TArgs...> args)
+                noexcept(std::is_nothrow_copy_constructible_v<Function>)
             : function(function), args(args)
             {}
 
@@ -383,7 +426,7 @@ namespace lib::fp {
             template <std::size_t ...I>
             void apply(IExecutor* executor, std::index_sequence<I...>) noexcept
             try {
-                details::Result<R>::set(executor, (*function)(std::get<I>(args).get()...));
+                details::Result<R>::set(executor, (*function)(details::unwrap(std::get<I>(args), typetraits::tag_v<details::could_call_without_cast<Function, I, std::tuple<TArgs...>>>)...));
             } catch (...) {
                 details::Result<R>::set(typetraits::tag_t<std::exception_ptr>, executor, std::current_exception());
             }
@@ -395,10 +438,24 @@ namespace lib::fp {
                 }
             }
 
+            template <std::size_t I>
+            std::size_t subscribe_arg(IExecutor* executor) noexcept
+            {
+                if constexpr (could_call_without_cast<Function, I, std::tuple<TArgs...>>) {
+                    return 1U;
+                } else {
+                    if (std::get<I>(args).subscribe(*executor, *this)) {
+                        return 1U;
+                    } else {
+                        return 0U;
+                    }
+                }
+            }
+
             template <std::size_t ...I>
             void run(IExecutor* executor, std::index_sequence<I...>) noexcept
             {
-                args_ready = ((std::get<I>(args).subscribe(*executor, *this) ? 1U : 0U) + ... + 0);
+                args_ready = (subscribe_arg<I>(executor) + ... + 0);
                 if (args_ready == sizeof...(TArgs)) {
                     executor->add(this);
                 }
@@ -407,35 +464,58 @@ namespace lib::fp {
             void run(IExecutor* executor) noexcept final
             {
                 if (args_ready == 0) {
-                    run(executor, std::make_index_sequence<sizeof...(TArgs)>{});
+                    return run(executor, std::make_index_sequence<sizeof...(TArgs)>{});
                 }
                 if (args_ready != 0) {
-                    apply(executor, std::make_index_sequence<sizeof...(TArgs)>{});
+                    return apply(executor, std::make_index_sequence<sizeof...(TArgs)>{});
                 }
             }
         };
 
         template <class Function, class R>
-        class FunctionResultImpl<Function, R, R, typetraits::List<>>
-            : public details::Result<R>
+        class FunctionResultImpl<Function, R, R, typetraits::List<>>: public details::IResult<R>
         {
+            std::optional<R> value;
+            std::exception_ptr exception;
+
         public:
-            FunctionResultImpl(const details::FunctionPtr<Function>& function, std::tuple<>) noexcept
-            try {
-                details::Result<R>::set(nullptr, (*function)());
-            } catch (...) {
-                details::Result<R>::set(typetraits::tag_t<std::exception_ptr>, nullptr, std::current_exception());
+            FunctionResultImpl(const details::FunctionPtr<Function>& function, const std::tuple<>&) noexcept
+            {
+                try {
+                    value.emplace((*function)());
+                } catch (...) {
+                    exception = std::current_exception();
+                }
             }
 
-        private:
-            void add_task(IExecutor&) noexcept final
+            [[nodiscard]] bool ready() const noexcept final
             {
+                return true;
+            }
+
+            [[nodiscard]] const R& get() const final
+            {
+                if (exception) {
+                    std::rethrow_exception(exception);
+                }
+                return *value;
+            }
+
+            [[nodiscard]] bool subscribe(IExecutor&, IAwaiter&) final
+            {
+                return true;
+            }
+
+            [[nodiscard]] const R& wait(IExecutor&) final
+            {
+                return get();
             }
         };
 
-        template <class Function, class R, class ...TArgs>
-        class FunctionResultImpl<Function, R, Fn<R, Dynamic>, typetraits::List<TArgs...>>
-            : private IExecutor::ITask
+        template <class Function, class R, class Impl, class ...TArgs>
+        class FunctionResultImpl<Function, R, Fn<R, Impl>, typetraits::List<TArgs...>>
+            : public details::IResult<R>
+            , private IExecutor::ITask
             , private IAwaiter
         {
             details::FunctionPtr<Function> function;
@@ -446,7 +526,7 @@ namespace lib::fp {
                 Stop, Prepare, Running, Ready
             };
             State state = State::Stop;
-            RawStorage<Fn<R, Dynamic>> result;
+            RawStorage<Fn<R, Impl>> result;
             std::exception_ptr exception = nullptr;
 
             mutable data_structures::DLList subscribers;
@@ -466,20 +546,20 @@ namespace lib::fp {
             : function(function), args(args)
             {}
 
-            ~FunctionResultImpl()
+            ~FunctionResultImpl() override
             {
-                if (state == State::Ready) {
+                if (exception == nullptr && (state == State::Ready || state == State::Running)) {
                     result.destroy();
                 }
             }
 
-            [[nodiscard]] bool ready() const noexcept
+            [[nodiscard]] bool ready() const noexcept final
             {
                 std::lock_guard lock(mutex);
                 return state == State::Ready;
             }
 
-            [[nodiscard]] const R& get() const
+            [[nodiscard]] const R& get() const final
             {
                 if (exception) {
                     rethrow_exception(exception);
@@ -487,7 +567,7 @@ namespace lib::fp {
                 return result.ptr()->get();
             }
 
-            bool subscribe(IExecutor& executor, IAwaiter& awaiter)
+            bool subscribe(IExecutor& executor, IAwaiter& awaiter) final
             {
                 std::lock_guard lock(mutex);
                 switch (state) {
@@ -506,7 +586,7 @@ namespace lib::fp {
                 return false;
             }
 
-            const R& wait(IExecutor& executor)
+            const R& wait(IExecutor& executor) final
             {
                 Awaiter awaiter;
                 if (!subscribe(executor, awaiter)) {
@@ -520,15 +600,17 @@ namespace lib::fp {
             template <std::size_t ...I>
             void apply(IExecutor* executor, std::index_sequence<I...>) noexcept
             try {
-                auto& fn = *result.emplace((*function)(std::get<I>(args).get()...));
+                auto& fn = *result.emplace((*function)(details::unwrap(std::get<I>(args), typetraits::tag_v<details::could_call_without_cast<Function, I, std::tuple<TArgs...>>>)...));
                 if (fn.subscribe(*executor, *this)) {
                     state = State::Ready;
+                    emit(executor);
                 } else {
                     state = State::Running;
                 }
             } catch (...) {
                 state = State::Ready;
                 exception = std::current_exception();
+                emit(executor);
             }
 
             void wakeup(IExecutor* executor) noexcept final
@@ -536,7 +618,7 @@ namespace lib::fp {
                 std::lock_guard lock(mutex);
                 if (state == State::Prepare) {
                     if (++args_ready == sizeof...(TArgs)) {
-                        apply(executor, std::make_index_sequence<sizeof...(TArgs)>{});
+                        executor->add(this);
                     }
                 }
                 if (state == State::Running) {
@@ -545,19 +627,36 @@ namespace lib::fp {
                 }
             }
 
+            template <std::size_t I>
+            std::size_t subscribe_arg(IExecutor* executor) noexcept
+            {
+                if constexpr (could_call_without_cast<Function, I, std::tuple<TArgs...>>) {
+                    return 1U;
+                } else {
+                    if (std::get<I>(args).subscribe(*executor, *this)) {
+                        return 1U;
+                    } else {
+                        return 0U;
+                    }
+                }
+            }
+
             template <std::size_t ...I>
             void run(IExecutor* executor, std::index_sequence<I...>) noexcept
             {
-                args_ready = ((std::get<I>(args).subscribe(*executor, *this) ? 1U : 0U) + ... + 0);
+                args_ready = (subscribe_arg<I>(executor) + ... + 0);
                 if (args_ready == sizeof...(TArgs)) {
-                    apply(executor, std::make_index_sequence<sizeof...(TArgs)>{});
+                    executor->add(this);
                 }
             }
 
             void run(IExecutor* executor) noexcept final
             {
-                if (state == State::Prepare) {
-                    run(executor, std::make_index_sequence<sizeof...(TArgs)>{});
+                if (args_ready != 0) {
+                    return apply(executor, std::make_index_sequence<sizeof...(TArgs)>{});
+                }
+                if (args_ready == 0) {
+                    return run(executor, std::make_index_sequence<sizeof...(TArgs)>{});
                 }
             }
         };
@@ -573,6 +672,8 @@ namespace lib::fp {
     template <class T, class Function, class ...TArgs>
     class Fn<T, ImplFCall<Function, TArgs...>>
     {
+        friend Fn<T, Dynamic>;
+
     public: // public types
         using ITypes = typetraits::List<>;
         using IParam = void;
@@ -631,7 +732,7 @@ namespace lib::fp {
         }
 
     public: // runtime interface
-        const auto& operator()(IExecutor& executor) const noexcept
+        const auto& operator()(IExecutor& executor) const
         {
             return result->wait(executor);
         }
@@ -768,7 +869,7 @@ namespace lib::fp {
                         return !function.subscribe(*executor, promise);
                     }
 
-                    [[nodiscard]] decltype(auto) await_resume() const noexcept
+                    [[nodiscard]] decltype(auto) await_resume() const
                     {
                         return function.get();
                     }
@@ -793,10 +894,10 @@ namespace lib::fp {
         using promise_type = details::Promise<T>;   
 
     private:
-        std::shared_ptr<details::Result<T>> result;  
+        std::shared_ptr<details::IResult<T>> result;  
 
     private:
-        explicit Fn(typetraits::TTag<typename details::Promise<T>::CoroResult>, std::shared_ptr<details::Result<T>> result) noexcept
+        explicit Fn(typetraits::TTag<typename details::Promise<T>::CoroResult>, std::shared_ptr<details::IResult<T>> result) noexcept
         : result(std::move(result))
         {}
 
@@ -812,6 +913,11 @@ namespace lib::fp {
         : result(std::make_shared<typename Fn<T, ImplFCall<std::remove_cvref_t<Function>>>::FunctionResult>(std::forward<Function>(function)))
         {}
 
+        template <class Function, class ...TArgs>
+        Fn(const Fn<T, ImplFCall<Function, TArgs...>>& function) noexcept
+        : result(function.result)
+        {}
+
         Fn(T value)
         {
             class Impl: public details::Result<T>
@@ -820,10 +926,6 @@ namespace lib::fp {
                 Impl(T value) noexcept(std::is_nothrow_move_constructible_v<T>)
                 {
                     details::Result<T>::set(nullptr, std::move(value));
-                }
-
-                void add_task(IExecutor& executor) noexcept final
-                {
                 }
             };
 
@@ -837,7 +939,7 @@ namespace lib::fp {
         }
 
     public: // runtime interface
-        const auto& operator()(IExecutor& executor) const noexcept
+        const auto& operator()(IExecutor& executor) const
         {
             return result->wait(executor);
         }
@@ -852,7 +954,7 @@ namespace lib::fp {
             return result->ready();
         }
 
-        [[nodiscard]] const T& get() const noexcept
+        [[nodiscard]] const T& get() const
         {
             return result->get();
         }
@@ -1020,13 +1122,28 @@ namespace lib::fp {
     unittest {
         SimpleExecutor executor;
 
-        const auto sum_coro = [](int lhs, int rhs) -> Val<int> {
-            co_return lhs + rhs;
+        const auto sum_coro = [](Val<int> lhs, Val<int> rhs) -> Val<int> {
+            co_return co_await lhs + co_await rhs;
         };
 
         Fn<int, int, int, ImplFCall<decltype(sum_coro)>> sum = sum_coro;
+        check(sum(0, details::test_coro())(executor) == 42);
         check(sum(1, 2)(executor) == 3);
         check(sum(3)(2)(executor) == 5);
+    }
+
+    unittest {
+        SimpleExecutor executor;
+
+        int (*inc_fn)(int) = [] (int value) noexcept {
+            return value + 1;
+        };
+        Fn inc = inc_fn;
+
+        const auto dec = [](Val<int> value) -> Val<int> {
+            co_return co_await value - 1;
+        };
+        check(dec(inc(0))(executor) == 0);
     }
 
     unittest {
