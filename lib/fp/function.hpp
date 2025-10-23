@@ -235,12 +235,11 @@ namespace lib::fp {
         class Result: public IResult<T>
         {
             enum class State {
-                Stop, Running, Ready
+                Stop, Running, Ready, Failed
             };
-            State state = State::Stop;
 
-            RawStorage<T> result;
-            std::exception_ptr exception = nullptr;
+            State state = State::Stop;
+            RawStorage<typetraits::List<T, std::exception_ptr>> result;
 
             mutable data_structures::DLList subscribers;
             mutable Mutex mutex;
@@ -259,42 +258,47 @@ namespace lib::fp {
         public:
             ~Result() override
             {
-                if (state == State::Ready) {
-                    result.destroy();
+                switch (state) {
+                    case State::Ready:
+                        result.destroy(std::in_place_type<T>);
+                        break;
+                    case State::Failed:
+                        result.destroy(std::in_place_type<std::exception_ptr>);
+                        break;
+                    default:
+                        break;
                 }
             }
 
             template <class U>
             void set(IExecutor* executor, U&& value) noexcept
             {
-                result.emplace(std::forward<U>(value));
+                result.emplace(std::in_place_type<T>, std::forward<U>(value));
                 state = State::Ready;
                 emit(executor);
             }
 
             void set(typetraits::TTag<std::exception_ptr>, IExecutor* executor, const std::exception_ptr& error) noexcept
             {
-                exception = error;
-                state = State::Ready;
+                result.emplace(std::in_place_type<std::exception_ptr>, error);
+                state = State::Failed;
                 emit(executor);
             }
 
             [[nodiscard]] bool ready() const noexcept final
             {
                 std::lock_guard lock(mutex);
-                return state == State::Ready;
+                return state == State::Ready || state == State::Failed;
             }
 
             [[nodiscard]] const T& get() const final
             {
                 std::lock_guard lock(mutex);
-                if (exception) {
-                    rethrow_exception(exception);
+                switch (state) {
+                    case State::Ready:  return *result.ptr(std::in_place_type<T>);
+                    case State::Failed: rethrow_exception(*result.ptr(std::in_place_type<std::exception_ptr>));
+                    default: throw std::runtime_error("value is not ready");
                 }
-                if (state == State::Ready) {
-                    return *result.ptr();
-                }
-                throw std::runtime_error("value is not ready");
             }
 
             [[nodiscard]] bool subscribe(IExecutor& executor, IAwaiter& awaiter) final
@@ -309,6 +313,7 @@ namespace lib::fp {
                     case State::Running:
                         subscribers.PushBack(awaiter);
                         return false;
+                    case State::Failed:
                     case State::Ready:
                         return true;
                 }

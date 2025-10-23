@@ -5,6 +5,16 @@
 
 namespace lib::fp {
 
+    struct Map
+    {
+        template <class Lhs, class Rhs>
+        auto operator () (Lhs&& lhs, Rhs&& rhs) const
+        {
+            return do_map(std::forward<Lhs>(lhs), std::forward<Rhs>(rhs));
+        }
+    };
+    const inline Map map;
+
     namespace details {
         template <class FLhs, class ALhs, class FRhs, class ARhs>
         class MapFunction;
@@ -76,7 +86,7 @@ namespace lib::fp {
             template <class ...TArgs, std::size_t ...LI, std::size_t ...RI>
             [[nodiscard]] auto call(const std::tuple<TArgs...>& args, std::index_sequence<LI...>, std::index_sequence<RI...>) const
             {
-                return rhs(lhs(std::get<LI>(args)...), std::get<RI>(args)...);
+                return map(lhs(std::get<LI>(args)...), rhs)(std::get<RI>(args)...);
             }
 
         public:
@@ -93,10 +103,9 @@ namespace lib::fp {
         };
     }
 
-
     template <class ...LTs, class ...RTs>
     requires (std::is_convertible_v<typename Fn<LTs...>::Result, typename Fn<RTs...>::IParam>)
-    auto map(Fn<LTs...> lhs, Fn<RTs...> rhs)
+    auto do_map(Fn<LTs...> lhs, Fn<RTs...> rhs)
     {
         using Signature = typetraits::Concat<
             typename Fn<LTs...>::ITypes,
@@ -110,16 +119,23 @@ namespace lib::fp {
         return FnType<Signature, ImplFCall<MapFunction>>(MapFunction(lhs, rhs));
     }
 
+    template <class TLhs, class Impl, class TRhs, class ...Ts>
+    requires (std::is_convertible_v<TLhs, TRhs>)
+    auto do_map(Fn<TLhs, Impl> lhs, Fn<TRhs, Ts...> rhs)
+    {
+        return rhs(lhs);
+    }
+
     template <class T, class F>
     requires (!is_function<std::remove_cvref_t<T>> && is_function<std::remove_cvref_t<F>>)
-    auto map(T&& value, F function)
+    auto do_map(T&& value, F function)
     {
-        return map(wrap(std::forward<T>(value)), function);
+        return do_map(wrap(std::forward<T>(value)), function);
     }
 
     template <class F, class T>
     requires (is_function<std::remove_cvref_t<F>> && !is_function<std::remove_cvref_t<T>>)
-    auto map(F lhs, T&& rhs)
+    auto do_map(F lhs, T&& rhs)
     {
         return map(lhs, Fn(std::forward<T>(rhs)));
     }

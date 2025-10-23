@@ -75,6 +75,20 @@ namespace lib::typetraits {
     }
 
     namespace impl {
+        template <class Lhs, class Head, class ...Tail>
+        struct MergeBinaryF<Lhs, Map<Head, Tail...>>
+        {
+            using Result = MergeBinary<Insert<Lhs, Head>, Map<Tail...>>;
+        };
+
+        template <class ...Types>
+        struct MergeBinaryF<Map<Types...>, Map<>>
+        {
+            using Result = Map<Types...>;
+        };
+    }
+
+    namespace impl {
         template <class ...Ts, std::size_t Index>
         struct GetF<Map<Ts...>, Index>
         {
