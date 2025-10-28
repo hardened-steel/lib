@@ -3,6 +3,7 @@
 #include <lib/raw.storage.hpp>
 #include <lib/typename.hpp>
 
+
 namespace lib::lockfree {
 
     template <class T>
@@ -10,6 +11,7 @@ namespace lib::lockfree {
     {
         alignas(std::hardware_destructive_interference_size) std::atomic<std::size_t> enqueue_pos;
         alignas(std::hardware_destructive_interference_size) std::atomic<std::size_t> dequeue_pos;
+
     public:
         struct Cell
         {
@@ -32,8 +34,10 @@ namespace lib::lockfree {
             }
             return std::max(1 << count, 2);
         }
+
     private:
         Span<Cell> buffer;
+
     public:
         constexpr MPMCQueue(Span<Cell> buffer) noexcept
         : buffer(buffer)

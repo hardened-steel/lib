@@ -12,14 +12,17 @@ namespace lib::lockfree {
         std::atomic_uint8_t current {0};
         std::uint8_t reader = 1;
         std::uint8_t writer = 2;
+
     private:
         constexpr static inline std::uint8_t dirty = (std::uint8_t(1) << std::uint8_t(7));
+
     public:
         constexpr SharedState(T state = T{}) noexcept(std::is_nothrow_copy_constructible_v<T>)
         : states{state, state, state}
         {}
         SharedState(const SharedState&) = delete;
         SharedState& operator=(const SharedState&) = delete;
+
     public:
         const T& get() noexcept
         {
