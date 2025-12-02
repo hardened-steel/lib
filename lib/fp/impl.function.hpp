@@ -37,6 +37,8 @@ namespace lib::fp {
         using FnType = typename FnTypeF<Ts, Impl>::Type;
     }
 
+    struct any {}; // NOLINT
+
     template <class T, class Function, class ...TArgs, Signature<T> Signature>
     class Fn<Signature, ImplFCall<Function, TArgs...>>
     {
@@ -209,10 +211,19 @@ namespace lib::fp {
         )
         auto operator () (Args&& ...iargs) const
         {
-            using Map = details::Call<Signature<Ts...>, Args...>;
-            using NewTypeList = typetraits::PopFront<details::MakeList<details::Apply<Signature<Ts...>, Map>>, sizeof...(Args)>;
+            using NewTypeList = typetraits::PopFront<typetraits::List<Ts...>, sizeof...(Args)>;
             using OType = details::FnType<NewTypeList, details::ImplFCallAdd<TFImpl, details::Wrapper<Args> ...>>;
             return OType(function, std::tuple_cat(args, std::make_tuple(details::wrap(std::forward<Args>(iargs)) ...)));
+        }
+
+        auto& get() noexcept
+        {
+            return *this;
+        }
+
+        auto& get() const noexcept
+        {
+            return *this;
         }
     };
 

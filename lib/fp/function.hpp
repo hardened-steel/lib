@@ -1,11 +1,12 @@
 #pragma once
+#include <lib/test.hpp>
 #include <lib/fp/impl.coroutine.hpp>
 #include <lib/fp/impl.function.hpp>
 #include <lib/fp/impl.value.hpp>
 
 
 namespace lib::fp {
-    template <StaticString Signature, class Impl>
+    /*template <StaticString Signature, class Impl>
     class Fn<Signature, Impl>: public Fn<details::ParseFunction<typetraits::VTag<Signature>>::signature, Impl>
     {
         using Base = Fn<details::ParseFunction<typetraits::VTag<Signature>>::signature, Impl>;
@@ -15,19 +16,49 @@ namespace lib::fp {
         using Base::operator();
     };
 
+    namespace details {
+        template <class Function>
+        class FunctionWrapper
+        {
+            Function function;
+
+        public:
+            FunctionWrapper(Function function) noexcept
+            : function(std::move(function))
+            {}
+
+            template <auto ...Signatures, class ...TArgs>
+            auto operator() (Fn<Signatures, TArgs> ...args) const
+            {
+                return function(std::move(args)...);
+            }
+        };
+    }
+
     template <StaticString Signature, class Function>
     auto fn(Function&& function)
     {
-        return Fn<Signature, ImplFCall<std::remove_cvref_t<Function>>>(std::forward<Function>(function));
+        return Fn<
+            details::ParseFunction<typetraits::VTag<Signature>>::signature,
+            ImplFCall<
+                details::FunctionWrapper<std::remove_reference_t<Function>>
+            >
+        >
+        {
+            std::forward<Function>(function)
+        };
     }
 
     unittest {
         SimpleExecutor executor;
 
-        const auto function = fn<"A -> A">([](auto a) { co_return co_await a; });
-        //check(function(1)(executor) == 1);
-        //check(function("hello")(executor) == "hello");
-    }
+        const auto inc = fn<"A -> A">(
+            []<auto Sign, class Impl>(Fn<Sign, Impl> a) -> Fn<Sign, Dynamic> {
+                co_return co_await a + 1;
+            }
+        );
+        check(inc(1)(executor) == 2);
+    }*/
 
     unittest {
         SimpleExecutor executor;

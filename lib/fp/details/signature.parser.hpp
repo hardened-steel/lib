@@ -2,6 +2,7 @@
 #include <lib/fp/base.function.hpp>
 #include <lib/typetraits/map.hpp>
 #include <lib/typetraits/if.hpp>
+#if 0
 #include <optional>
 
 
@@ -79,6 +80,25 @@ namespace lib::fp::details {
     using Replace = typename ReplaceF<T, Map>::Result;
 
 
+    template <class T>
+    struct PrepareParamF
+    {
+        using Result = T;
+    };
+
+    template <class T>
+    using PrepareParam = typename PrepareParamF<T>::Result;
+
+    template <class T, class ...Ts, Signature<T, Ts...> FSignature, class Impl>
+    struct PrepareParamF<Fn<FSignature, Impl>>
+    {
+        using Result = std::conditional_t<
+            sizeof...(Ts) != 0,
+            Signature<T, Ts...>,
+            T
+        >;
+    };
+
     template <class Signature, class T, class Map>
     struct CallF;
 
@@ -91,7 +111,7 @@ namespace lib::fp::details {
         using Result = typename DoCall<
             Signature<Ts...>,
             List<Args...>,
-            typename CallF<Signature<T, Ts...>, Arg, Map>::Result
+            typename CallF<Signature<T, Ts...>, PrepareParam<Arg>, Map>::Result
         >::Result;
     };
 
@@ -125,7 +145,18 @@ namespace lib::fp::details {
     {
         using Result = typetraits::Merge<
             typetraits::Map<typetraits::Map<Type<Name>, Template<T>>>,
-            typename CallF<List<IArgs...>, List<TArgs...>, Map>::Result
+            typename CallF<List<IArgs...>, List<PrepareParam<TArgs>...>, Map>::Result
+        >;
+    };
+
+    template <StaticString Name, class IArg, class ...Others, class T, class TArg, class Map>
+    struct CallF<Signature<Type<Name, IArg>, Others...>, Signature<T, TArg>, Map>
+    {
+        template <class U>
+        using STemplate = Signature<PrepareParam<T>, U>;
+        using Result = typetraits::Merge<
+            typetraits::Map<typetraits::Map<Type<Name>, Template<STemplate>>>,
+            typename CallF<List<IArg>, List<PrepareParam<TArg>>, Map>::Result
         >;
     };
 
@@ -155,7 +186,7 @@ namespace lib::fp::details {
     {
         using Result = typename CallF<
             List<Ts...>,
-            List<TArgs...>,
+            List<PrepareParam<TArgs>...>,
             Map
         >::Result;
     };
@@ -271,7 +302,7 @@ namespace lib::fp::details {
     struct Read<VTag<Str>, VTag<It>>
     {
         constexpr static inline bool result = true;
-        using Result = VTag<StaticString(std::array {Str[It]})>;
+        using Result = VTag<StaticString<1>(std::array<char, 1> {Str[It]})>;
         using Next = VTag<It + 1>;
     };
 
@@ -802,3 +833,4 @@ namespace lib::fp::details {
         );
     }
 }
+#endif

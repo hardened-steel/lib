@@ -116,3 +116,41 @@ namespace lib::fp {
         }
     }
 }
+
+/*namespace std {
+    template <class R, auto ...Signs, class ...Implementations>
+    struct std::coroutine_traits<R, lib::fp::Fn<Signs, Implementations>...>
+    {
+        using promise_type = lib::fp::details::Promise<R>;
+    };
+
+    template <class R, class T, auto ...Signs, class ...Implementations>
+    struct std::coroutine_traits<R, T&, lib::fp::Fn<Signs, Implementations>...>
+    {
+        using promise_type = lib::fp::details::Promise<R>;
+    };
+
+    template <class R, class T, auto ...Signs, class ...Implementations>
+    struct std::coroutine_traits<R, const T&, lib::fp::Fn<Signs, Implementations>...>
+    {
+        using promise_type = lib::fp::details::Promise<R>;
+    };
+
+    template <auto Sign, auto ...Signs, class ...Implementations>
+    struct std::coroutine_traits<lib::fp::Fn<Sign, lib::fp::Dynamic>, lib::fp::Fn<Signs, Implementations>...>
+    {
+        using promise_type = typename lib::fp::Fn<Sign, lib::fp::Dynamic>::promise_type;
+    };
+
+    template <auto Sign, class T, auto ...Signs, class ...Implementations>
+    struct std::coroutine_traits<lib::fp::Fn<Sign, lib::fp::Dynamic>, T&, lib::fp::Fn<Signs, Implementations>...>
+    {
+        using promise_type = typename lib::fp::Fn<Sign, lib::fp::Dynamic>::promise_type;
+    };
+
+    template <auto Sign, class T, auto ...Signs, class ...Implementations>
+    struct std::coroutine_traits<lib::fp::Fn<Sign, lib::fp::Dynamic>, const T&, lib::fp::Fn<Signs, Implementations>...>
+    {
+        using promise_type = typename lib::fp::Fn<Sign, lib::fp::Dynamic>::promise_type;
+    };
+}*/
