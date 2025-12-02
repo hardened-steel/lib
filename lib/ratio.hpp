@@ -3,25 +3,25 @@
 #include <lib/typetraits/if.hpp>
 
 namespace lib {
-    template<class ...Ratios>
+    template <class ...Ratios>
     struct RatioMultiplyF;
 
-    template<class ...Ratios>
+    template <class ...Ratios>
     using RatioMultiply = typename RatioMultiplyF<Ratios...>::Result;
 
-    template<class Ratio, class ...Ratios>
+    template <class Ratio, class ...Ratios>
     struct RatioMultiplyF<Ratio, Ratios...>
     {
         using Result = std::ratio_multiply<Ratio, RatioMultiply<Ratios...>>;
     };
 
-    template<class Ratio>
+    template <class Ratio>
     struct RatioMultiplyF<Ratio>
     {
         using Result = Ratio;
     };
 
-    template<class Ratio, int P>
+    template <class Ratio, int P>
     struct RatioPowF
     {
         constexpr static inline auto degree = (P < 0) ? -P : +P;
@@ -33,18 +33,18 @@ namespace lib {
         >;
     };
 
-    template<class Ratio>
+    template <class Ratio>
     struct RatioPowF<Ratio, 1>
     {
         using Result = Ratio;
     };
 
-    template<class Ratio>
+    template <class Ratio>
     struct RatioPowF<Ratio, 0>
     {
         using Result = std::ratio<1>;
     };
 
-    template<class Ratio, int P>
+    template <class Ratio, int P>
     using RatioPow = typename RatioPowF<Ratio, P>::Result;
 }

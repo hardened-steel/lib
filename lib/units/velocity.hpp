@@ -1,7 +1,7 @@
 #pragma once
-#include <lib/units.hpp>
 #include <lib/units/si/length.hpp>
-#include <lib/quantity.hpp>
+#include <lib/units/si/time.hpp>
+
 
 namespace lib::units {
     struct Velocity
@@ -17,7 +17,7 @@ namespace lib::units {
         }
     };
 
-    template<>
+    template <>
     struct Dimension<Velocity::Dimension>
     {
         using Type = Velocity;

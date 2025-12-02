@@ -5,22 +5,22 @@
 
 namespace lib::interpreter {
     namespace ast {
-        template<class T>
+        template <class T>
         struct FilterVariableDeclarationF
         {
             using Result = void;
         };
 
-        template<class InitExpression>
+        template <class InitExpression>
         struct FilterVariableDeclarationF<VariableDeclaration<InitExpression>>
         {
             using Result = VariableDeclaration<InitExpression>;
         };
 
-        template<class T>
+        template <class T>
         using FilterVariableDeclaration = typename FilterVariableDeclarationF<T>::Result;
 
-        template<class ...Operators>
+        template <class ...Operators>
         using GetVariables = lib::typetraits::Erase<
             lib::typetraits::Apply<
                 lib::typetraits::CreateSet<Operators...>,
@@ -29,7 +29,7 @@ namespace lib::interpreter {
             void
         >;
 
-        template<class ...Operators>
+        template <class ...Operators>
         struct Scope: Operator
         {
             std::tuple<Operators...> operators;
@@ -45,7 +45,7 @@ namespace lib::interpreter {
             constexpr Scope(const Scope& other) = default;
             constexpr Scope& operator=(const Scope& other) = default;
 
-            template<class Context, class ...TArgs>
+            template <class Context, class ...TArgs>
             constexpr auto operator()(Context& ctx, TArgs&& ...args) const
             {
                 return ctx(*this, std::forward<TArgs>(args)...);
@@ -53,7 +53,7 @@ namespace lib::interpreter {
         };
     }
 
-    template<class ...Operators>
+    template <class ...Operators>
     constexpr auto scope(const Operators& ...operators) noexcept
     {
         return ast::Scope<Operators...>(operators...);

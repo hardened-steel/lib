@@ -846,7 +846,7 @@ C++20 has basic support for ``stackless`` coroutines. Integrating them into the 
 At the moment, write channels do not support iterators. We can multiplex them, but we cannot mix them with read channels. At least, this functionality has not been developed yet. The idea is to enable writing like this:
 ```cpp
     for (auto& [input, output]: lib::IChannelAll{channel_in, channel_out}) {
-        output = process(input);
+        ouput = proccess(input);
     }
 ```
 Thus, the loop body will be executed only when both channels are ready: there is a new message in the input channel, and there is space for sending in the output channel.

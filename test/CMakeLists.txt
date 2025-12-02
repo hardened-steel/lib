@@ -1,15 +1,17 @@
 add_executable(${PROJECT_NAME}-test
+    functional-programming.cpp
     units.cpp
     #parser.cpp
     typetraits.cpp
     #interpreter.cpp
-    channel.cpp
-    event.cpp
-    cycle.buffer.cpp
+    #channel.cpp
+    #event.cpp
+    #cycle.buffer.cpp
+    #coro.cpp
 )
 set_target_properties(${PROJECT_NAME}-test
     PROPERTIES
-        CXX_STANDARD 17
+        CXX_STANDARD 20
         CXX_STANDARD_REQUIRED YES
         CXX_EXTENSIONS YES
         C_STANDARD 11

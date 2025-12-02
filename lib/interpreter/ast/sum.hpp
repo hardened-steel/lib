@@ -3,7 +3,7 @@
 #include <lib/concept.hpp>
 
 namespace lib::interpreter::ast {
-    template<class Lhs, class Rhs>
+    template <class Lhs, class Rhs>
     struct Sum: Expression
     {
         Lhs lhs;
@@ -15,14 +15,14 @@ namespace lib::interpreter::ast {
         constexpr Sum(const Sum& other) = default;
         constexpr Sum& operator=(const Sum& other) = default;
 
-        template<class Context, class ...TArgs>
+        template <class Context, class ...TArgs>
         constexpr auto operator()(Context& ctx, TArgs&& ...args) const
         {
             return ctx(*this, std::forward<TArgs>(args)...);
         }
     };
 
-    template<
+    template <
         class Lhs, class Rhs,
         typename = lib::Require<std::is_base_of_v<ast::Expression, Lhs>, std::is_base_of_v<ast::Expression, Rhs>>
     >

@@ -8,19 +8,19 @@ class Symbol
 {
 };
 
-template<auto K>
+template <auto K>
 struct Coefficient
 {
     constexpr static inline auto value = K;
 };
 
-template<class ...Adds>
+template <class ...Adds>
 struct Add
 {
     using Type = lib::typetraits::List<Adds...>;
 };
 
-template<class ...Muls>
+template <class ...Muls>
 struct Mul
 {
     using Type = lib::typetraits::List<Muls...>;

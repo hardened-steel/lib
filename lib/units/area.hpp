@@ -1,8 +1,9 @@
 #pragma once
-#include <lib/quantity.hpp>
+#include <lib/units/si/length.hpp>
+
 
 namespace lib::units {
-    template<class Length>
+    template <class Length>
     struct Area
     {
         using Dimension = Degree<Length, 2>;
@@ -16,13 +17,13 @@ namespace lib::units {
         }
     };
 
-    template<class Length>
+    template <class Length>
     struct Dimension<TDegree<Length, 2>>
     {
         using Type = Area<Length>;
     };
 
-    template<char ...Chars>
+    template <char ...Chars>
     constexpr auto operator ""_m2() noexcept
     {
         using Parser = literal::Parser<Chars...>;
@@ -33,5 +34,4 @@ namespace lib::units {
     {
         return Quantity<Area<Metre>, long double>(quantity);
     }
-
 }

@@ -7,7 +7,7 @@
 
 namespace lib::interpreter {
     namespace ast {
-        template<class InitExpression>
+        template <class InitExpression>
         struct VariableDeclaration: Operator
         {
             std::string_view name;
@@ -19,7 +19,7 @@ namespace lib::interpreter {
             constexpr VariableDeclaration(const VariableDeclaration& other) = default;
             constexpr VariableDeclaration& operator=(const VariableDeclaration& other) = default;
 
-            template<class Context, class ...TArgs>
+            template <class Context, class ...TArgs>
             constexpr auto operator()(Context& ctx, TArgs&& ...args) const
             {
                 return ctx(*this, std::forward<TArgs>(args)...);
@@ -36,13 +36,13 @@ namespace lib::interpreter {
             constexpr Variable(const Variable& other) = default;
             constexpr Variable& operator=(const Variable& other) = default;
 
-            template<class RValue, typename = lib::Require<std::is_base_of_v<Expression, RValue>>>
+            template <class RValue, typename = lib::Require<std::is_base_of_v<Expression, RValue>>>
             constexpr auto operator=(const RValue& rhs) const noexcept
             {
                 return VariableDeclaration<RValue>(name, rhs);
             }
 
-            template<class Context, class ...TArgs>
+            template <class Context, class ...TArgs>
             constexpr auto operator()(Context& ctx, TArgs&& ...args) const
             {
                 return ctx(*this, std::forward<TArgs>(args)...);

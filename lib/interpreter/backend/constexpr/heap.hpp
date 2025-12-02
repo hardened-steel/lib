@@ -3,7 +3,7 @@
 
 namespace lib::interpreter::const_expr {
 
-    template<std::size_t Size>
+    template <std::size_t Size>
     struct Heap
     {
         constexpr static inline std::uint32_t size = Size;

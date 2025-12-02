@@ -2,6 +2,7 @@
 #include <lib/units.hpp>
 #include <chrono>
 
+
 namespace lib {
     namespace units {
         struct Second
@@ -16,7 +17,7 @@ namespace lib {
                 return string("s");
             }
         };
-    
+
         struct Minute
         {
             using Dimension = Minute;
@@ -30,12 +31,12 @@ namespace lib {
             }
         };
 
-        template<>
+        template <>
         struct Convert<Minute, Second>
         {
             using Coefficient = std::ratio<60>;
         };
-    
+        
         struct Hour
         {
             using Dimension = Hour;
@@ -49,40 +50,42 @@ namespace lib {
             }
         };
 
-        template<>
+        template <>
         struct Convert<Hour, Minute>
         {
             using Coefficient = std::ratio<60>;
         };
 
-        template<>
+        template <>
         struct Convert<Hour, Second>
         {
-            using Coefficient = std::ratio<60 * 60>;
+            using Coefficient = std::ratio<3600>;
         };
 
         using namespace std::chrono_literals;
     }
 
-    template<class T, class Ratio>
+    template <class T, class Ratio>
     class Quantity<units::Second, T, Ratio>: public QuantityBase<units::Second, T, Ratio>
     {
         using Base = QuantityBase<units::Second, T, Ratio>;
+
     public:
         using Base::Base;
         using Base::operator=;
-        
-        template<class IRatio>
+
+        template <class IRatio>
         constexpr Quantity(std::chrono::duration<T, IRatio> duration) noexcept
         : Quantity(Quantity<units::Second, T, IRatio>(duration.count()))
         {}
 
-        template<class IRatio>
-        Quantity& operator=(std::chrono::duration<T, IRatio> duration) noexcept
+        template <class IRatio>
+        Quantity& operator = (std::chrono::duration<T, IRatio> duration) noexcept
         {
             Base::quantity = Quantity<units::Second, T, IRatio>(duration.count());
             return *this;
         }
+
     public:
         constexpr operator std::chrono::duration<T, std::ratio<1>>() const noexcept
         {
@@ -90,24 +93,22 @@ namespace lib {
         }
     };
 
-    template<class T>
-    Quantity(std::chrono::duration<T, std::ratio<1>>) -> Quantity<units::Second, T, std::ratio<1>>;
-
-    template<class T, class Ratio>
+    template <class T, class Ratio>
     class Quantity<units::Minute, T, Ratio>: public QuantityBase<units::Minute, T, Ratio>
     {
         using Base = QuantityBase<units::Minute, T, Ratio>;
+
     public:
         using Base::Base;
         using Base::operator=;
 
-        template<class IRatio>
+        template <class IRatio>
         constexpr Quantity(std::chrono::duration<T, IRatio> duration) noexcept
         : Quantity(Quantity<units::Minute, T, IRatio>(duration.count()))
         {}
 
-        template<class IRatio>
-        Quantity& operator=(std::chrono::duration<T, IRatio> duration) noexcept
+        template <class IRatio>
+        Quantity& operator = (std::chrono::duration<T, IRatio> duration) noexcept
         {
             Base::quantity = Quantity<units::Minute, T, IRatio>(duration.count());
             return *this;
@@ -119,24 +120,22 @@ namespace lib {
         }
     };
 
-    template<class T>
-    Quantity(std::chrono::duration<T, std::ratio<60>>) -> Quantity<units::Minute, T>;
-
-    template<class T, class Ratio>
+    template <class T, class Ratio>
     class Quantity<units::Hour, T, Ratio>: public QuantityBase<units::Hour, T, Ratio>
     {
         using Base = QuantityBase<units::Hour, T, Ratio>;
+
     public:
         using Base::Base;
         using Base::operator=;
 
-        template<class IRatio>
+        template <class IRatio>
         constexpr Quantity(std::chrono::duration<T, IRatio> duration) noexcept
         : Quantity(Quantity<units::Hour, T, IRatio>(duration.count()))
         {}
 
-        template<class IRatio>
-        Quantity& operator=(std::chrono::duration<T, IRatio> duration) noexcept
+        template <class IRatio>
+        Quantity& operator = (std::chrono::duration<T, IRatio> duration) noexcept
         {
             Base::quantity = Quantity<units::Hour, T, IRatio>(duration.count());
             return *this;
@@ -148,38 +147,45 @@ namespace lib {
         }
     };
 
-    template<class T>
-    Quantity(std::chrono::duration<T, std::ratio<60 * 60>>) -> Quantity<units::Hour, T>;
+    template <class T>
+    Quantity(std::chrono::duration<T, std::ratio<1>>) -> Quantity<units::Second, T>;
 
-    template<class T, class Ratio>
+    template <class T>
+    Quantity(std::chrono::duration<T, std::ratio<60>>) -> Quantity<units::Minute, T>;
+
+    template <class T>
+    Quantity(std::chrono::duration<T, std::ratio<3600>>) -> Quantity<units::Hour, T>;
+
+    template <class T, class Ratio>
     Quantity(std::chrono::duration<T, Ratio>) -> Quantity<units::Second, T, Ratio>;
 
-    template<class Unit, class A, class RatioA, class B, class RatioB>
-    constexpr auto operator* (const Quantity<Unit, A, RatioA>& a, std::chrono::duration<B, RatioB> b) noexcept
+
+    template <class Unit, class A, class RatioA, class B, class RatioB>
+    constexpr auto operator * (const Quantity<Unit, A, RatioA>& a, std::chrono::duration<B, RatioB> b) noexcept
     {
         return a * Quantity(b);
     }
 
-    template<class Unit, class A, class RatioA, class B, class RatioB>
-    constexpr auto operator* (std::chrono::duration<A, RatioA> a, const Quantity<Unit, B, RatioB>& b) noexcept
+    template <class Unit, class A, class RatioA, class B, class RatioB>
+    constexpr auto operator * (std::chrono::duration<A, RatioA> a, const Quantity<Unit, B, RatioB>& b) noexcept
     {
         return Quantity(a) * b;
     }
 
-    template<class Unit, class A, class RatioA, class B, class RatioB>
-    constexpr auto operator/ (const Quantity<Unit, A, RatioA>& a, std::chrono::duration<B, RatioB> b) noexcept
+    template <class Unit, class A, class RatioA, class B, class RatioB>
+    constexpr auto operator / (const Quantity<Unit, A, RatioA>& a, std::chrono::duration<B, RatioB> b) noexcept
     {
         return a / Quantity(b);
     }
 
-    template<class Unit, class A, class RatioA, class B, class RatioB>
-    constexpr auto operator/ (std::chrono::duration<A, RatioA> a, const Quantity<Unit, B, RatioB>& b) noexcept
+    template <class Unit, class A, class RatioA, class B, class RatioB>
+    constexpr auto operator / (std::chrono::duration<A, RatioA> a, const Quantity<Unit, B, RatioB>& b) noexcept
     {
         return Quantity(a) / b;
     }
 
     namespace units {
-        template<char ...Chars>
+        template <char ...Chars>
         constexpr auto operator ""_s() noexcept
         {
             using Parser = literal::Parser<Chars...>;
@@ -191,7 +197,7 @@ namespace lib {
             return Quantity<units::Second, long double>(quantity);
         }
 
-        template<char ...Chars>
+        template <char ...Chars>
         constexpr auto operator ""_min() noexcept
         {
             using Parser = literal::Parser<Chars...>;
@@ -203,7 +209,7 @@ namespace lib {
             return Quantity<units::Minute, long double>(quantity);
         }
 
-        template<char ...Chars>
+        template <char ...Chars>
         constexpr auto operator ""_h() noexcept
         {
             using Parser = literal::Parser<Chars...>;
@@ -215,7 +221,7 @@ namespace lib {
             return Quantity<units::Hour, long double>(quantity);
         }
 
-        template<char ...Chars>
+        template <char ...Chars>
         constexpr auto operator ""_ms() noexcept
         {
             using Parser = literal::Parser<Chars...>;
@@ -227,7 +233,7 @@ namespace lib {
             return Quantity<units::Second, long double, std::milli>(quantity);
         }
 
-        template<char ...Chars>
+        template <char ...Chars>
         constexpr auto operator ""_us() noexcept
         {
             using Parser = literal::Parser<Chars...>;
@@ -239,7 +245,7 @@ namespace lib {
             return Quantity<units::Second, long double, std::micro>(quantity);
         }
 
-        template<char ...Chars>
+        template <char ...Chars>
         constexpr auto operator ""_ns() noexcept
         {
             using Parser = literal::Parser<Chars...>;

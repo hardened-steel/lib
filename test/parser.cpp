@@ -5,22 +5,22 @@
 
 namespace utils
 {
-	template<class To, class From>
+	template <class To, class From>
 	auto convert(const From& from);
 
-	template<class T>
+	template <class T>
 	class rule
 	{
 	public:
 		using value_type = T;
 		using result_t = std::optional<value_type>;
 	public:
-		template<class Rule>
+		template <class Rule>
 		rule(Rule&& rule)
 		{}
-		template<class Begin, class End>
+		template <class Begin, class End>
 		constexpr result_t operator()(Begin& it, End vend) const;
-		template<std::size_t ISize>
+		template <std::size_t ISize>
 		constexpr result_t operator()(const T(&value)[ISize]) const;
 	};
 }
@@ -112,33 +112,33 @@ namespace {
 	struct null_element_t {} constexpr null_element;
 	struct null_tuple_t {} constexpr null_tuple;
 
-	template<std::size_t Index, class T, std::size_t Size>
+	template <std::size_t Index, class T, std::size_t Size>
 	constexpr const auto& array_get(const std::array<T, Size>& array)
 	{
 		static_assert(Index < Size);
 		return array[Index];
 	}
 
-	template<std::size_t Index, class T>
+	template <std::size_t Index, class T>
 	constexpr const auto& array_get(const T& array)
 	{
 		static_assert(Index == 0);
 		return array;
 	}
 
-	template<std::size_t Index>
+	template <std::size_t Index>
 	constexpr const auto& array_get(const null_array_t&)
 	{
 		return null_element;
 	}
 
-	template<class T, std::size_t Size>
+	template <class T, std::size_t Size>
 	constexpr const auto& array_top(const std::array<T, Size>& array)
 	{
 		return array.back();
 	}
 
-	template<class T>
+	template <class T>
 	constexpr const auto& array_top(const T& array)
 	{
 		return array;
@@ -149,50 +149,50 @@ namespace {
 		return null_element;
 	}
 
-	template<class T, std::size_t Size, std::size_t... I>
+	template <class T, std::size_t Size, std::size_t... I>
 	constexpr std::array<T, Size + 1u> array_push(const std::array<T, Size>& array, const T& value, std::index_sequence<I...>)
 	{
 		return {array[I]..., value};
 	}
 
-	template<class T, std::size_t Size>
+	template <class T, std::size_t Size>
 	constexpr std::array<T, Size + 1u> array_push(const std::array<T, Size>& array, const T& value)
 	{
 		return array_push(array, value, std::make_index_sequence<Size>());
 	}
 
-	template<class T, std::size_t SizeA, std::size_t... Ia, std::size_t SizeB, std::size_t... Ib>
+	template <class T, std::size_t SizeA, std::size_t... Ia, std::size_t SizeB, std::size_t... Ib>
 	constexpr std::array<T, SizeA + SizeB> array_push(const std::array<T, SizeA>& array, std::index_sequence<Ia...>, const std::array<T, SizeB>& value, std::index_sequence<Ib...>)
 	{
 		return {array[Ia]..., value[Ib]...};
 	}
 
-	template<class T, std::size_t SizeA, std::size_t SizeB>
+	template <class T, std::size_t SizeA, std::size_t SizeB>
 	constexpr auto array_push(const std::array<T, SizeA>& array, const std::array<T, SizeB>& value)
 	{
 		return array_push(array, std::make_index_sequence<SizeA>(), value, std::make_index_sequence<SizeA>());
 	}
 
 
-	template<class T, std::size_t Size>
+	template <class T, std::size_t Size>
 	constexpr const auto& array_push(const std::array<T, Size>& array, const null_element_t&)
 	{
 		return array;
 	}
 
-	template<class T, std::size_t Size>
+	template <class T, std::size_t Size>
 	constexpr const auto& array_push(const std::array<T, Size>& array, const null_array_t&)
 	{
 		return array;
 	}
 
-	template<class T>
+	template <class T>
 	constexpr std::array<T, 2u> array_push(const T& a, const T& b)
 	{
 		return {a, b};
 	}
 
-	template<class T>
+	template <class T>
 	constexpr const auto& array_push(const null_array_t&, const T& value)
 	{
 		return value;
@@ -203,7 +203,7 @@ namespace {
 		return array;
 	}
 
-	template<class ...TArgs>
+	template <class ...TArgs>
 	constexpr auto tuple_make(TArgs&& ...args)
 	{
 		return std::make_tuple(std::forward<TArgs>(args)...);
@@ -214,25 +214,25 @@ namespace {
 		return null_tuple;
 	}
 
-	template<class A, class B>
+	template <class A, class B>
 	constexpr auto tuple_cat(const A& a, const B& b)
 	{
 		return std::tuple_cat(a, b);
 	}
 
-	template<class T>
+	template <class T>
 	constexpr const auto& tuple_cat(const T& tuple, const null_tuple_t&)
 	{
 		return tuple;
 	}
 
-	template<class T>
+	template <class T>
 	constexpr const auto& tuple_cat(const null_tuple_t&, const T& tuple)
 	{
 		return tuple;
 	}
 
-	template<class Head, class ...Tail>
+	template <class Head, class ...Tail>
 	constexpr auto& tuple_head(const std::tuple<Head, Tail...>& tuple)
 	{
 		return std::get<0>(tuple);
@@ -243,46 +243,46 @@ namespace {
 		return null;
 	}
 
-	template<class Head, class ...Tail>
+	template <class Head, class ...Tail>
 	constexpr auto tuple_tail(const std::tuple<Head, Tail...>& tuple)
 	{
 		return tuple_make(std::get<Tail>(tuple)...);
 	}
 
-	template<class Head>
+	template <class Head>
 	constexpr auto tuple_tail(const std::tuple<Head>&)
 	{
 		return null_tuple;
 	}
 
-	template<class T, class V>
+	template <class T, class V>
 	struct is_array_push_value
 	{
 		constexpr static bool value = false;
 	};
 
-	template<class T>
+	template <class T>
 	struct is_array_push_value<T, T>
 	{
 		constexpr static bool value = true;
 	};
 
-	template<class T>
+	template <class T>
 	struct is_array_push_value<const T&, T>
 	{
 		constexpr static bool value = true;
 	};
 
-	template<class T, std::size_t Size>
+	template <class T, std::size_t Size>
 	struct is_array_push_value<const std::array<T, Size>&, T>
 	{
 		constexpr static bool value = true;
 	};
 
-	template<class T, class V>
+	template <class T, class V>
 	inline constexpr bool is_array_push_value_v = is_array_push_value<T, V>::value;
 
-	template<class T, class ...Ts>
+	template <class T, class ...Ts>
 	constexpr auto tuple_push(const std::tuple<Ts...>& tuple, const T& value)
 	{
 		const auto& head = tuple_head(tuple);
@@ -292,19 +292,19 @@ namespace {
 			return tuple_cat(tuple_make(head), tuple_push(tuple_tail(tuple), value));
 	}
 
-	template<class T>
+	template <class T>
 	constexpr auto tuple_push(const null_tuple_t&, const T& value)
 	{
 		return tuple_make(value);
 	}
 
-	template<class ...Ta, class ...Tb>
+	template <class ...Ta, class ...Tb>
 	constexpr auto tuple_push(const std::tuple<Ta...>& tuple, const std::tuple<Tb...>& value)
 	{
 		return tuple_push(tuple_push(tuple, tuple_head(value)), tuple_tail(value));
 	}
 
-	template<class T, class ...Ts>
+	template <class T, class ...Ts>
 	constexpr auto& tuple_top(const std::tuple<Ts...>& tuple)
 	{
 		const auto& head = tuple_head(tuple);
@@ -314,7 +314,7 @@ namespace {
 			return tuple_top<T>(tuple_tail(tuple));
 	}
 
-	template<class T, std::size_t Index, class ...Ts>
+	template <class T, std::size_t Index, class ...Ts>
 	constexpr auto& tuple_get(const std::tuple<Ts...>& tuple)
 	{
 		const auto& head = tuple_head(tuple);
@@ -386,8 +386,8 @@ TEST(parser, extended2)
 
 }
 
-/*template<>
-struct converter<unsigned>
+/*template <>
+struct convertor<unsigned>
 {
 	unsigned load(const number_range& range)
 	{

@@ -2,6 +2,7 @@
 #include <lib/units.hpp>
 #include <lib/literal.hpp>
 
+
 namespace lib::units {
     struct ECurrent
     {
@@ -17,7 +18,7 @@ namespace lib::units {
     };
     constexpr inline Unit<ECurrent> ampere {};
 
-    template<char ...Chars>
+    template <char ...Chars>
     constexpr auto operator ""_A() noexcept
     {
         using Parser = literal::Parser<Chars...>;

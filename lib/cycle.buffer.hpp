@@ -2,16 +2,17 @@
 #include <iterator>
 #include <array>
 #include <atomic>
+#include <lib/raw.storage.hpp>
 
 namespace lib {
 
-    template<class T, std::size_t N>
+    template <class T, std::size_t N>
     class CycleBuffer;
 
     struct CycleBufferEndIterator {};
     constexpr inline CycleBufferEndIterator cycle_buffer_end = {};
 
-    template<class T, std::size_t N>
+    template <class T, std::size_t N>
     class CycleBufferIterator
     {
     protected:
@@ -25,7 +26,7 @@ namespace lib {
         using pointer           = T*;
         using reference         = T&;
     public:
-        constexpr CycleBufferIterator(T* buffer, std::size_t position, std::size_t size) noexcept
+        constexpr CycleBufferIterator(T* buffer, std::size_t position, std::size_t size) noexcept // NOLINT
         : buffer(buffer), position(position), size(size)
         {}
         CycleBufferIterator(const CycleBufferIterator&) = default;
@@ -99,21 +100,22 @@ namespace lib {
         }
     };
 
-    template<class T, std::size_t N>
+    template <class T, std::size_t N>
     class CycleBuffer
     {
         alignas(64) std::atomic<std::size_t> m_recv_index{0};
         alignas(64) std::atomic<std::size_t> m_send_index{0};
 
-        using Storage = std::aligned_storage_t<sizeof(T), alignof(T)>;
+        using Storage = RawStorage<T>;
         std::array<Storage, N + 1> array;
     public:
         T recv() noexcept
         {
             const auto recv_index = m_recv_index.load();
-            auto ptr = reinterpret_cast<T*>(&array[recv_index]);
+            auto& storage = array[recv_index];
+            auto* ptr = storage.ptr();
             T value = std::move(*ptr);
-            ptr->~T();
+            storage.destroy();
 
             auto new_recv_index = recv_index + 1;
             if (new_recv_index == array.size()) {
@@ -133,7 +135,7 @@ namespace lib {
             if (new_send_index == array.size()) {
                 new_send_index = 0;
             }
-            new(&array[send_index]) T(std::move(value));
+            array[send_index].emplace(std::move(value));
             m_send_index.store(new_send_index);
         }
         bool spoll() const noexcept
@@ -168,10 +170,10 @@ namespace lib {
             }
         }
     public:
-        
+
         CycleBufferIterator<const T, N + 1> begin() const noexcept
         {
-            return {reinterpret_cast<const T*>(array.data()), m_recv_index.load(std::memory_order_relaxed), rsize()};
+            return {array[0].ptr(), m_recv_index.load(std::memory_order_relaxed), rsize()};
         }
         auto end() const noexcept
         {
@@ -189,7 +191,7 @@ namespace lib {
 
         CycleBufferIterator<T, N + 1> begin() noexcept
         {
-            return {reinterpret_cast<T*>(array.data()), m_recv_index.load(std::memory_order_relaxed), rsize()};
+            return {array[0].ptr(), m_recv_index.load(std::memory_order_relaxed), rsize()};
         }
         auto end() noexcept
         {
@@ -202,7 +204,7 @@ namespace lib {
             if(auto count = from.count.load(std::memory_order_relaxed)) {
                 auto tail = from.tail;
                 while(count--) {
-                    auto ptr = reinterpret_cast<T*>(&from.array[tail]);
+                    auto* ptr = from.array[tail].ptr();
                     to.send(*ptr);
                     tail += 1;
                     if(tail == N) {
@@ -235,7 +237,7 @@ namespace lib {
             }
             return *this;
         }
-        CycleBuffer& operator=(CycleBuffer&& other)
+        CycleBuffer& operator=(CycleBuffer&& other) noexcept
         {
             if(this != &other) {
                 clear();

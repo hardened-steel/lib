@@ -2,6 +2,7 @@
 #include <lib/units.hpp>
 #include <lib/literal.hpp>
 
+
 namespace lib::units {
     struct LuminousIntensity
     {
@@ -17,7 +18,7 @@ namespace lib::units {
     };
     constexpr inline Unit<LuminousIntensity> candela {};
 
-    template<char ...Chars>
+    template <char ...Chars>
     constexpr auto operator ""_cd() noexcept
     {
         using Parser = literal::Parser<Chars...>;

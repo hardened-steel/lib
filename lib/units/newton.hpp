@@ -1,5 +1,8 @@
 #pragma once
-#include <lib/quantity.hpp>
+#include <lib/units/si/mass.hpp>
+#include <lib/units/si/length.hpp>
+#include <lib/units/si/time.hpp>
+
 
 namespace lib::units {
     struct Newton
@@ -16,13 +19,13 @@ namespace lib::units {
     };
     constexpr inline Unit<Newton> newton {};
 
-    template<>
+    template <>
     struct Dimension<Newton::Dimension>
     {
         using Type = Newton;
     };
 
-    template<char ...Chars>
+    template <char ...Chars>
     constexpr auto operator ""_N() noexcept
     {
         using Parser = literal::Parser<Chars...>;

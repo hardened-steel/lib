@@ -1,10 +1,11 @@
 #pragma once
-#include <lib/quantity.hpp>
+#include <lib/units/si/time.hpp>
+
 
 namespace lib::units {
     struct Hertz
     {
-        using Dimension = Degree<Time, -1>;
+        using Dimension = Degree<Second, -1>;
         constexpr static auto name() noexcept
         {
             return string("frequency");
@@ -16,13 +17,13 @@ namespace lib::units {
     };
     constexpr inline Unit<Hertz> hertz {};
 
-    template<>
+    template <>
     struct Dimension<Hertz::Dimension>
     {
         using Type = Hertz;
     };
 
-    template<char ...Chars>
+    template <char ...Chars>
     constexpr auto operator ""_Hz() noexcept
     {
         using Parser = literal::Parser<Chars...>;

@@ -15,6 +15,7 @@
 #include <string_view>
 #include <type_traits>
 
+
 struct A {
     using Dimension = A;
     constexpr static auto symbol() noexcept
@@ -45,7 +46,7 @@ namespace lib::units {
     };
     constexpr inline Unit<units::Turn> turn {};
 
-    template<char ...Chars>
+    template <char ...Chars>
     constexpr auto operator "" _turn() noexcept
     {
         using Parser = literal::Parser<Chars...>;
@@ -69,14 +70,14 @@ namespace lib::units {
             return string("rpm");
         }
     };
-    template<>
+    template <>
     struct Dimension<Rpm::Dimension>
     {
         using Type = Rpm;
     };
     constexpr inline Unit<Rpm> rpm {};
 
-    template<char ...Chars>
+    template <char ...Chars>
     constexpr auto operator "" _rpm() noexcept
     {
         using Parser = literal::Parser<Chars...>;
@@ -114,19 +115,19 @@ namespace lib::units {
         }
     };
 
-    template<>
+    template <>
     struct Dimension<Multiplying<TDegree<Hour, -1>, Mile>>
     {
         using Type = VelocityMPH;
     };
 
-    template<>
+    template <>
     struct Convert<Mile, Metre>
     {
         using Coefficient = std::ratio<1609344, 1000>;
     };
 
-    template<char ...Chars>
+    template <char ...Chars>
     constexpr auto operator "" _mile() noexcept
     {
         using Parser = literal::Parser<Chars...>;

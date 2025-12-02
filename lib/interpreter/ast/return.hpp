@@ -5,7 +5,7 @@
 
 namespace lib::interpreter {
     namespace ast {
-        template<class RValue>
+        template <class RValue>
         struct Return: Operator
         {
             RValue expression;
@@ -16,7 +16,7 @@ namespace lib::interpreter {
             constexpr Return(const Return& other) = default;
             constexpr Return& operator=(const Return& other) = default;
 
-            template<class Context, class ...TArgs>
+            template <class Context, class ...TArgs>
             constexpr auto operator()(Context& ctx, TArgs&& ...args) const
             {
                 return ctx(*this, std::forward<TArgs>(args)...);
@@ -24,7 +24,7 @@ namespace lib::interpreter {
         };
     }
 
-    template<class RValue, typename = lib::Require<std::is_base_of_v<ast::Expression, RValue>>>
+    template <class RValue, typename = lib::Require<std::is_base_of_v<ast::Expression, RValue>>>
     constexpr auto ret(const RValue& expression) noexcept
     {
         return ast::Return<RValue>(expression);

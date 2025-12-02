@@ -14,10 +14,10 @@ namespace lib::interpreter {
         StructBegin, StructEnd
     };
 
-    template<class T>
+    template <class T>
     struct TypeTrait;
 
-    template<>
+    template <>
     struct TypeTrait<std::uint32_t>
     {
         /*constexpr*/ static inline auto name = lib::StaticString("u32");
@@ -30,7 +30,7 @@ namespace lib::interpreter {
         };
     };
 
-    template<class ...TArgs>
+    template <class ...TArgs>
     /*constexpr*/ auto make_code(TArgs&& ...args) {
         return std::array<std::string, sizeof...(TArgs)>{
             std::forward<TArgs>(args)...
@@ -65,7 +65,7 @@ namespace lib::interpreter {
         /*constexpr*/ FunctionCallSkip& operator=(const FunctionCallSkip&) = default;
     };
 
-    template<class ...TArgs>
+    template <class ...TArgs>
     /*constexpr*/ auto make_skips(TArgs&& ...args) {
         return std::array<FunctionCallSkip, sizeof...(TArgs)>{
             std::forward<TArgs>(args)...
@@ -79,13 +79,13 @@ namespace lib::interpreter {
         std::size_t      code;
     };
 
-    template<std::size_t N>
+    template <std::size_t N>
     using TypeCodes = std::array<std::uint32_t, N>;
 
-    template<std::size_t N>
+    template <std::size_t N>
     using TypeInfos = std::array<TypeInfo, N>;
 
-    template<std::size_t C, std::size_t I>
+    template <std::size_t C, std::size_t I>
     struct Types
     {
         TypeCodes<C> codes;
@@ -94,13 +94,13 @@ namespace lib::interpreter {
         /*constexpr*/ Types(const TypeCodes<C>& codes, const TypeInfos<I>& infos) noexcept
         : codes(codes), infos(infos)
         {}
-        template<class TI>
+        template <class TI>
         /*constexpr*/ Types(const std::array<TypeCode, C>&, const std::array<TI, I>&) noexcept
         : codes(codes), infos(infos)
         {}
         /*constexpr*/ Types(const Types&) = default;
 
-        template<class Name>
+        template <class Name>
         /*constexpr*/ auto& find(const Name& name) const
         {
             for(const auto& info: infos) {
@@ -113,10 +113,10 @@ namespace lib::interpreter {
         }
     };
 
-    template<std::size_t C, std::size_t I>
+    template <std::size_t C, std::size_t I>
     Types(const TypeCodes<C>&, const TypeInfos<I>&) -> Types<C, I>;
 
-    template<std::size_t C, class TI, std::size_t I>
+    template <std::size_t C, class TI, std::size_t I>
     Types(const std::array<TypeCode, C>&, const std::array<TI, I>&) -> Types<C, I>;
 
     /*constexpr*/ inline Types<4, 4> init_types (
@@ -131,7 +131,7 @@ namespace lib::interpreter {
     /*constexpr*/ inline std::array<FunctionInfo, 0> null_functions {};
     inline const auto null_text = std::make_tuple(make_code(), make_skips());
 
-    template<class Parent, class Types, class Variables, class Functions, class Text>
+    template <class Parent, class Types, class Variables, class Functions, class Text>
     struct CompilerContext
     {
         Parent parent;
@@ -155,7 +155,7 @@ namespace lib::interpreter {
         , text(text)
         {}
 
-        template<class Name>
+        template <class Name>
         /*constexpr*/ auto& find_variable(const Name& name) const
         {
             for(const auto& var: variables) {
@@ -166,7 +166,7 @@ namespace lib::interpreter {
             return parent.find_variable(name);
         }
 
-        template<class Name>
+        template <class Name>
         /*constexpr*/ auto& find_type(const Name& name) const
         {
             for(const auto& type: types.infos) {
@@ -177,7 +177,7 @@ namespace lib::interpreter {
             return parent.find_type(name);
         }
 
-        template<class Name>
+        template <class Name>
         /*constexpr*/ auto& find_function(const Name& name, lib::span<const TypeInfo> ptypes) const
         {
             for(const auto& fn: functions) {
@@ -200,7 +200,7 @@ namespace lib::interpreter {
         }
     };
 
-    template<class Types, class Variables, class Functions, class Text>
+    template <class Types, class Variables, class Functions, class Text>
     struct CompilerContext<void, Types, Variables, Functions, Text>
     {
         Types types;
@@ -221,7 +221,7 @@ namespace lib::interpreter {
         , text(text)
         {}
 
-        template<class Name>
+        template <class Name>
         /*constexpr*/ auto& find_variable(const Name& name) const
         {
             for(const auto& var: variables) {
@@ -233,7 +233,7 @@ namespace lib::interpreter {
             throw std::out_of_range(std::string(message.begin(), message.end()));
         }
 
-        template<class Name>
+        template <class Name>
         /*constexpr*/ auto& find_type(const Name& name) const
         {
             for(const auto& type: types.infos) {
@@ -245,7 +245,7 @@ namespace lib::interpreter {
             throw std::out_of_range(std::string(message.begin(), message.end()));
         }
 
-        template<class Name>
+        template <class Name>
         /*constexpr*/ auto& find_function(const Name& name, lib::span<const TypeInfo> ptypes) const
         {
             for(const auto& fn: functions) {
@@ -269,7 +269,7 @@ namespace lib::interpreter {
         }
     };
 
-    template<class Parent, class Types, class Variables, class Functions, class Text>
+    template <class Parent, class Types, class Variables, class Functions, class Text>
     /*constexpr*/ auto make_context
     (
         const Parent& parent,
@@ -282,7 +282,7 @@ namespace lib::interpreter {
         return CompilerContext<Parent, Types, Variables, Functions, Text>(parent, types, variables, functions, text);
     }
 
-    template<class Types, class Variables, class Functions, class Text>
+    template <class Types, class Variables, class Functions, class Text>
     /*constexpr*/ auto make_context
     (
         const Types& types,
@@ -294,7 +294,7 @@ namespace lib::interpreter {
         return CompilerContext<void, Types, Variables, Functions, Text>(types, variables, functions, text);
     }
 
-    template<class Context, class Name, class Params, std::size_t ...I>
+    template <class Context, class Name, class Params, std::size_t ...I>
     /*constexpr*/ auto compile
     (
         const Context& ctx,
@@ -353,13 +353,13 @@ namespace lib::interpreter {
         );
     }
 
-    template<class Context, class Name, class Params>
+    template <class Context, class Name, class Params>
     /*constexpr*/ auto compile(const Context& ctx, const ast::FunctionCall<Name, Params>& call)
     {
         return compile(ctx, call, std::make_index_sequence<std::tuple_size_v<Params>>{});
     }
 
-    template<class Context>
+    template <class Context>
     /*constexpr*/ auto compile(const Context& ctx, const ast::Variable& var)
     {
         const auto& var_info = ctx.find_variable(var.name);
@@ -389,13 +389,13 @@ namespace lib::interpreter {
         );
     }
 
-    template<class Context, class Lhs, class Rhs>
+    template <class Context, class Lhs, class Rhs>
     /*constexpr*/ auto compile(const Context& ctx, const ast::Sum<Lhs, Rhs>& sum)
     {
         return compile(ctx, fn("operator: lhs + rhs")(sum.lhs, sum.rhs));
     }
 
-    template<class Context, class LType>
+    template <class Context, class LType>
     /*constexpr*/ auto compile(const Context& ctx, const ast::Literal<LType>& literal)
     {
         using Type = TypeTrait<LType>;
@@ -409,7 +409,7 @@ namespace lib::interpreter {
         );
     }
 
-    template<class Context, class RValue>
+    template <class Context, class RValue>
     /*constexpr*/ auto compile(const Context& ctx, const ast::Return<RValue>& ret)
     {
         const auto& var_info = ctx.find_variable("return::value");
@@ -444,7 +444,7 @@ namespace lib::interpreter {
         );
     }
 
-    template<
+    template <
         class Context,
         class ...Statements,
         std::size_t ...I
@@ -459,7 +459,7 @@ namespace lib::interpreter {
         (compile(ctx, std::get<I>(scope.operators)), ...);
     }
 
-    template<
+    template <
         class Context,
         class Statement,
         class ...Statements
@@ -476,7 +476,7 @@ namespace lib::interpreter {
         );
     }
 
-    template<
+    template <
         class Context,
         class Function,
         std::size_t ...I
@@ -511,7 +511,7 @@ namespace lib::interpreter {
         );
     }
 
-    template<class Context, class Function>
+    template <class Context, class Function>
     /*constexpr*/ auto compile_function
     (
         const Context& ctx,
@@ -522,7 +522,7 @@ namespace lib::interpreter {
     }
 
     // statements
-    template<
+    template <
         class Parent, class Types, class Variables, class Functions, class Text,
         class Name, class RType, class Parameters, class Body
     >
@@ -541,13 +541,13 @@ namespace lib::interpreter {
     }
 
     // module
-    template<class Module, std::size_t ...I>
+    template <class Module, std::size_t ...I>
     /*constexpr*/ auto compile_module(const Module& module, std::index_sequence<I...>)
     {
         auto context = make_context(init_types, null_variables, null_functions, null_text);
         return (context + ... + std::get<I>(module.statements));
     }
-    template<class ...Statements>
+    template <class ...Statements>
     /*constexpr*/ auto compile(const ast::Module<Statements...>& module)
     {
         return compile_module(module, std::make_index_sequence<ast::Module<Statements...>::size>{});

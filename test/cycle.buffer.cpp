@@ -40,7 +40,7 @@ TEST(cyclebuffer, base)
 
         EXPECT_EQ(buffer.rsize(), 0);
         EXPECT_EQ(buffer.wsize(), 5);
-        
+
         buffer.send(1);
         buffer.send(2);
         buffer.send(3);
