@@ -2,19 +2,20 @@
 #include <string_view>
 #include <lib/array.hpp>
 
+
 namespace lib {
 
     template <std::size_t N>
     class StaticString;
 
     template <std::size_t Lhs, std::size_t Rhs>
-    constexpr auto operator+ (const StaticString<Lhs>& lhs, const StaticString<Rhs>& rhs) noexcept;
+    constexpr auto operator + (const StaticString<Lhs>& lhs, const StaticString<Rhs>& rhs) noexcept;
 
     template <std::size_t N>
     class StaticString
     {
         template <std::size_t Lhs, std::size_t Rhs>
-        friend constexpr auto operator+ (const StaticString<Lhs>& lhs, const StaticString<Rhs>& rhs) noexcept;
+        friend constexpr auto operator + (const StaticString<Lhs>& lhs, const StaticString<Rhs>& rhs) noexcept;
 
     public:
         std::array<char, N> string;
@@ -90,19 +91,19 @@ namespace lib {
     }
 
     template <std::size_t Lhs, std::size_t Rhs>
-    constexpr auto operator+ (const StaticString<Lhs>& lhs, const StaticString<Rhs>& rhs) noexcept
+    constexpr auto operator + (const StaticString<Lhs>& lhs, const StaticString<Rhs>& rhs) noexcept
     {
         return StaticString(lib::concat(lhs.string, rhs.string));
     }
 
     template <std::size_t Lhs, std::size_t Rhs>
-    constexpr auto operator+ (const StaticString<Lhs>& lhs, RawArray<const char, Rhs> rhs) noexcept
+    constexpr auto operator + (const StaticString<Lhs>& lhs, RawArray<const char, Rhs> rhs) noexcept
     {
         return StaticString(lib::concat(lhs.string, rhs));
     }
 
     template <std::size_t Lhs, std::size_t Rhs>
-    constexpr auto operator+ (RawArray<const char, Lhs>& lhs, const StaticString<Rhs>& rhs) noexcept
+    constexpr auto operator + (RawArray<const char, Lhs>& lhs, const StaticString<Rhs>& rhs) noexcept
     {
         return StaticString(lib::concat(lhs, rhs.string));
     }

@@ -15,6 +15,7 @@
 #include <string_view>
 #include <type_traits>
 
+
 struct A {
     using Dimension = A;
     constexpr static auto symbol() noexcept

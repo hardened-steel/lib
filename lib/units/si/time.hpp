@@ -2,6 +2,7 @@
 #include <lib/units.hpp>
 #include <chrono>
 
+
 namespace lib {
     namespace units {
         struct Second
@@ -35,7 +36,7 @@ namespace lib {
         {
             using Coefficient = std::ratio<60>;
         };
-
+        
         struct Hour
         {
             using Dimension = Hour;
@@ -79,7 +80,7 @@ namespace lib {
         {}
 
         template <class IRatio>
-        Quantity& operator=(std::chrono::duration<T, IRatio> duration) noexcept
+        Quantity& operator = (std::chrono::duration<T, IRatio> duration) noexcept
         {
             Base::quantity = Quantity<units::Second, T, IRatio>(duration.count());
             return *this;
@@ -92,13 +93,11 @@ namespace lib {
         }
     };
 
-    template <class T>
-    Quantity(std::chrono::duration<T, std::ratio<1>>) -> Quantity<units::Second, T, std::ratio<1>>;
-
     template <class T, class Ratio>
     class Quantity<units::Minute, T, Ratio>: public QuantityBase<units::Minute, T, Ratio>
     {
         using Base = QuantityBase<units::Minute, T, Ratio>;
+
     public:
         using Base::Base;
         using Base::operator=;
@@ -109,7 +108,7 @@ namespace lib {
         {}
 
         template <class IRatio>
-        Quantity& operator=(std::chrono::duration<T, IRatio> duration) noexcept
+        Quantity& operator = (std::chrono::duration<T, IRatio> duration) noexcept
         {
             Base::quantity = Quantity<units::Minute, T, IRatio>(duration.count());
             return *this;
@@ -121,13 +120,11 @@ namespace lib {
         }
     };
 
-    template <class T>
-    Quantity(std::chrono::duration<T, std::ratio<60>>) -> Quantity<units::Minute, T>;
-
     template <class T, class Ratio>
     class Quantity<units::Hour, T, Ratio>: public QuantityBase<units::Hour, T, Ratio>
     {
         using Base = QuantityBase<units::Hour, T, Ratio>;
+
     public:
         using Base::Base;
         using Base::operator=;
@@ -138,7 +135,7 @@ namespace lib {
         {}
 
         template <class IRatio>
-        Quantity& operator=(std::chrono::duration<T, IRatio> duration) noexcept
+        Quantity& operator = (std::chrono::duration<T, IRatio> duration) noexcept
         {
             Base::quantity = Quantity<units::Hour, T, IRatio>(duration.count());
             return *this;
@@ -151,31 +148,38 @@ namespace lib {
     };
 
     template <class T>
+    Quantity(std::chrono::duration<T, std::ratio<1>>) -> Quantity<units::Second, T>;
+
+    template <class T>
+    Quantity(std::chrono::duration<T, std::ratio<60>>) -> Quantity<units::Minute, T>;
+
+    template <class T>
     Quantity(std::chrono::duration<T, std::ratio<3600>>) -> Quantity<units::Hour, T>;
 
     template <class T, class Ratio>
     Quantity(std::chrono::duration<T, Ratio>) -> Quantity<units::Second, T, Ratio>;
 
+
     template <class Unit, class A, class RatioA, class B, class RatioB>
-    constexpr auto operator* (const Quantity<Unit, A, RatioA>& a, std::chrono::duration<B, RatioB> b) noexcept
+    constexpr auto operator * (const Quantity<Unit, A, RatioA>& a, std::chrono::duration<B, RatioB> b) noexcept
     {
         return a * Quantity(b);
     }
 
     template <class Unit, class A, class RatioA, class B, class RatioB>
-    constexpr auto operator* (std::chrono::duration<A, RatioA> a, const Quantity<Unit, B, RatioB>& b) noexcept
+    constexpr auto operator * (std::chrono::duration<A, RatioA> a, const Quantity<Unit, B, RatioB>& b) noexcept
     {
         return Quantity(a) * b;
     }
 
     template <class Unit, class A, class RatioA, class B, class RatioB>
-    constexpr auto operator/ (const Quantity<Unit, A, RatioA>& a, std::chrono::duration<B, RatioB> b) noexcept
+    constexpr auto operator / (const Quantity<Unit, A, RatioA>& a, std::chrono::duration<B, RatioB> b) noexcept
     {
         return a / Quantity(b);
     }
 
     template <class Unit, class A, class RatioA, class B, class RatioB>
-    constexpr auto operator/ (std::chrono::duration<A, RatioA> a, const Quantity<Unit, B, RatioB>& b) noexcept
+    constexpr auto operator / (std::chrono::duration<A, RatioA> a, const Quantity<Unit, B, RatioB>& b) noexcept
     {
         return Quantity(a) / b;
     }

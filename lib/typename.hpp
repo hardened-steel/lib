@@ -1,6 +1,7 @@
 #pragma once
 #include <lib/static.string.hpp>
 
+
 namespace lib {
     namespace details::type_name {
         template <typename T>

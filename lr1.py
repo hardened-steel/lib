@@ -342,11 +342,18 @@ productions2 = [
     Production(NonTerminal("C"), [Terminal("d")]),
 ]
 
+productions2 = [
+    Production(NonTerminal("S'"), [NonTerminal("S")]),
+    Production(NonTerminal("S"), [Terminal("a"), Terminal("b")]),
+    Production(NonTerminal("S"), [Terminal("c")])
+]
+
 # Создадим объект грамматики
 #sheep_grammar = Grammar(productions_)
 #sequence = [BA, BA, BA, Terminal("$")]
-PARSE(Grammar(productions_), [BA, BA, BA, Terminal("$")])
+#PARSE(Grammar(productions_), [BA, BA, BA, Terminal("$")])
 
-PARSE(Grammar(productions), [Terminal("id"), Terminal("+"), Terminal("id"), Terminal("*"), Terminal("("), Terminal("id"), Terminal("+"), Terminal("id"), Terminal(")"), Terminal("$")])
+#PARSE(Grammar(productions), [Terminal("id"), Terminal("+"), Terminal("id"), Terminal("*"), Terminal("("), Terminal("id"), Terminal("+"), Terminal("id"), Terminal(")"), Terminal("$")])
 #PARSE(Grammar(productions), [Terminal("id"), Terminal("*"), Terminal("id"), Terminal("+"), Terminal("id"), Terminal("$")])
-PARSE(Grammar(productions2), [Terminal("c"), Terminal("d"), Terminal("d"), Terminal("$")])
+#PARSE(Grammar(productions2), [Terminal("c"), Terminal("d"), Terminal("d"), Terminal("$")])
+PARSE(Grammar(productions2), [Terminal("a"), Terminal("b"), Terminal("$")])

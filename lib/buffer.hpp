@@ -114,6 +114,7 @@ namespace lib::buffer {
     template <class T>
     struct Resource: Resource<const T>
     {
+        using Resource<const T>::data;
         virtual T* data() noexcept = 0;
     };
 

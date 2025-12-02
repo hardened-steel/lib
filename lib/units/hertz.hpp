@@ -1,5 +1,4 @@
 #pragma once
-#include <lib/quantity.hpp>
 #include <lib/units/si/time.hpp>
 
 

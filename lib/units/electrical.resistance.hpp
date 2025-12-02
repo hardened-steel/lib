@@ -2,6 +2,8 @@
 #include <lib/quantity.hpp>
 #include <lib/units/area.hpp>
 #include <lib/units/si/electric.current.hpp>
+#include <lib/units/si/time.hpp>
+
 
 namespace lib::units {
     struct EResistance

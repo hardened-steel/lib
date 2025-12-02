@@ -1,11 +1,10 @@
 #pragma once
-#include <algorithm>
 #include <cstddef>
 #include <lib/typetraits/list.hpp>
 #include <lib/typetraits/for.hpp>
 #include <lib/typename.hpp>
-#include <limits>
 #include <type_traits>
+
 
 namespace lib::typetraits {
 
@@ -260,4 +259,31 @@ namespace lib::typetraits {
 
     template <class Set, template <typename> class F>
     using Apply = typename impl::ApplyF<Set, F>::Result;
+
+    namespace test {
+        using EmptySet = Set<>;
+        static_assert(std::is_same_v<Set<int>, Insert<EmptySet, int>>);
+        static_assert(std::is_same_v<Set<int>, Insert<Set<int>, int>>);
+        static_assert(std::is_same_v<Set<float, int>, Insert<Set<int>, float>>);
+        static_assert(std::is_same_v<Set<float, int, void>, Insert<Set<float, int>, void>>);
+
+        using S = Insert<Insert<Insert<EmptySet, void>, int>, float>;
+        static_assert(std::is_same_v<Get<S, 0>, float>);
+        static_assert(std::is_same_v<Get<S, 1>, int>);
+        static_assert(std::is_same_v<Get<S, 2>, void>);
+
+        static_assert(std::is_same_v<Insert<Insert<Insert<S, int>, float>, void>, Insert<Insert<Insert<S, float>, int>, void>>);
+        static_assert(lib::typetraits::index<Set<float, int>, int> == 1);
+        static_assert(lib::typetraits::index<Set<float, int>, float> == 0);
+        static_assert(lib::typetraits::index<S, unsigned> == S::size);
+
+        static_assert(exists<S, float>);
+        static_assert(!exists<S, unsigned>);
+        static_assert(std::is_same_v<Erase<S, float>, Set<int, void>>);
+        static_assert(std::is_same_v<Erase<S, unsigned>, S>);
+
+        static_assert(std::is_same_v<S, Merge<EmptySet, S>>);
+        static_assert(std::is_same_v<S, Merge<EmptySet, EmptySet, Insert<Insert<S, float>, int>, Set<void>>>);
+        static_assert(std::is_same_v<S, Merge<EmptySet, Insert<Set<float>, int>, EmptySet, Set<void>>>);
+    }
 }

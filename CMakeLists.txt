@@ -7,8 +7,6 @@ include(FetchContent)
 include(platform)
 enable_testing()
 
-set(CMAKE_CXX_STANDARD 17)
-
 add_subdirectory(lib)
 
 include(CPack)

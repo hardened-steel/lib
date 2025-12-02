@@ -4,7 +4,7 @@
 namespace lib::data_structures {
 
     template <class Tag = void>
-    class FLListElement;
+    struct FLListElement;
 
     template <>
     struct FLListElement<void>

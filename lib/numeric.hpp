@@ -1,6 +1,7 @@
 #pragma once
 #include <numeric>
 
+
 namespace lib {
     template <class Lhs, class Rhs>
     constexpr auto gcd(Lhs lhs, Rhs rhs) noexcept

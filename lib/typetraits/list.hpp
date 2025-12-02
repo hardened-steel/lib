@@ -235,4 +235,31 @@ namespace lib::typetraits {
 
     template <class List, std::size_t Count = 1>
     using PopFront = impl::PopFront<List, Count>;
+
+    namespace test {
+        using EmptyList = List<>;
+        static_assert(EmptyList::size == 0);
+        static_assert(std::is_same_v<InsertBack<EmptyList, void>, List<void>>);
+        static_assert(std::is_same_v<InsertFront<EmptyList, void>, List<void>>);
+        static_assert(std::is_same_v<InsertFront<EmptyList, void>, InsertBack<EmptyList, void>>);
+
+        using L1 = List<int>;
+        static_assert(L1::size == 1);
+        using L2 = InsertBack<L1, void>;
+        static_assert(L2::size == 2);
+        static_assert(std::is_same_v<InsertBack<L1, void>, List<int, void>>);
+        static_assert(std::is_same_v<InsertFront<L1, void>, List<void, int>>);
+
+        static_assert(std::is_same_v<Get<L2, 0>, int>);
+        static_assert(std::is_same_v<Get<L2, 1>, void>);
+
+        static_assert(std::is_same_v<L1, Concat<L1, EmptyList>>);
+        static_assert(std::is_same_v<L2, Concat<EmptyList, L2>>);
+        static_assert(std::is_same_v<List<int, void, float>, Concat<L2, List<float>>>);
+        static_assert(std::is_same_v<List<int, int, int>, Concat<L1, L1, L1>>);
+        static_assert(std::is_same_v<L1, Concat<L1>>);
+
+        static_assert(std::is_same_v<L1, Remove<L2, 1>>);
+        static_assert(std::is_same_v<EmptyList, Remove<L1, 0>>);
+    }
 }

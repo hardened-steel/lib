@@ -173,4 +173,16 @@ namespace lib::typetraits {
             using Result = Map<>;
         };
     }
+
+    namespace test {
+        using EmptyMap = Map<>;
+        static_assert(std::is_same_v<Map<Map<int, void>>, Insert<EmptyMap, Map<int, void>>>);
+        using TestMap = Insert<Insert<Insert<EmptyMap, Map<int, void>>, Map<int, void>>, Map<float, char>>;
+        static_assert(std::is_same_v<Find<TestMap, int>, void>);
+        static_assert(std::is_same_v<Find<TestMap, float>, char>);
+        static_assert(lib::typetraits::exists<TestMap, int>);
+        static_assert(lib::typetraits::index<TestMap, int> == 0);
+        static_assert(lib::typetraits::index<TestMap, float> == 1);
+        static_assert(lib::typetraits::exists<TestMap, float>);
+    }
 }

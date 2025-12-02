@@ -1,9 +1,9 @@
 #pragma once
-#include <limits>
 #include <lib/numeric.hpp>
 #include <lib/ratio.hpp>
 #include <lib/literal.hpp>
 #include <lib/typetraits/set.hpp>
+
 
 namespace lib {
     namespace details::units {
@@ -563,7 +563,6 @@ namespace lib {
         static_assert(units::can_convert<UnitA, UnitB>);
         using CoefficientAB = units::ConvertCoefficient<UnitA, UnitB>;
         using CoefficientBA = units::ConvertCoefficient<UnitB, UnitA>;
-
         if constexpr (std::ratio_greater_v<CoefficientAB, CoefficientBA>) {
             using CQuantity = CommonQuantity<
                 Quantity<UnitA, A, ARatio>,
@@ -593,7 +592,6 @@ namespace lib {
         static_assert(units::can_convert<UnitA, UnitB>);
         using CoefficientAB = units::ConvertCoefficient<UnitA, UnitB>;
         using CoefficientBA = units::ConvertCoefficient<UnitB, UnitA>;
-
         if constexpr (std::ratio_greater_v<CoefficientAB, CoefficientBA>) {
             using CQuantity = CommonQuantity<
                 Quantity<UnitA, A, ARatio>,
@@ -617,7 +615,6 @@ namespace lib {
         static_assert(units::can_convert<UnitA, UnitB>);
         using CoefficientAB = units::ConvertCoefficient<UnitA, UnitB>;
         using CoefficientBA = units::ConvertCoefficient<UnitB, UnitA>;
-
         if constexpr (std::ratio_greater_v<CoefficientAB, CoefficientBA>) {
             using CQuantity = CommonQuantity<
                 Quantity<UnitA, A, ARatio>,
@@ -641,7 +638,6 @@ namespace lib {
         static_assert(units::can_convert<UnitA, UnitB>);
         using CoefficientAB = units::ConvertCoefficient<UnitA, UnitB>;
         using CoefficientBA = units::ConvertCoefficient<UnitB, UnitA>;
-
         if constexpr (std::ratio_greater_v<CoefficientAB, CoefficientBA>) {
             using CQuantity = CommonQuantity<
                 Quantity<UnitA, A, ARatio>,
@@ -665,7 +661,6 @@ namespace lib {
         static_assert(units::can_convert<UnitA, UnitB>);
         using CoefficientAB = units::ConvertCoefficient<UnitA, UnitB>;
         using CoefficientBA = units::ConvertCoefficient<UnitB, UnitA>;
-
         if constexpr (std::ratio_greater_v<CoefficientAB, CoefficientBA>) {
             using CQuantity = CommonQuantity<
                 Quantity<UnitA, A, ARatio>,

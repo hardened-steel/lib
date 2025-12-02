@@ -1,5 +1,8 @@
 #pragma once
-#include <lib/quantity.hpp>
+#include <lib/units/si/mass.hpp>
+#include <lib/units/si/length.hpp>
+#include <lib/units/si/time.hpp>
+
 
 namespace lib::units {
     struct Newton
